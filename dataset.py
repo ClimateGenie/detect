@@ -3,6 +3,7 @@ import json
 from zipfile import ZipFile
 import newspaper
 import wget
+from tqdm import tqdm 
 import os
 
 
@@ -59,7 +60,7 @@ class Dataset():
         # A collection of climate news
         ds_id = 1
         df = pd.read_csv('climate-news-db-dataset.csv') 
-        for index, article in df.iterrows():
+        for index, article in tqdm(df.iterrows(),desc = 'Climate-news-dbo', total  = len(df)):
             url = article['article_url']
             domain = article['newspaper_url']
             publisher = article['newspaper']
@@ -82,7 +83,7 @@ class Dataset():
                     'WebNewsEnglishSnippets.2019.csv',
                     'WebNewsEnglishSnippets.2020.csv']:
             df = pd.read_csv(file,header = None)
-            for index, article in df.iterrows():
+            for index, article in tqdm(df.iterrows(),desc = file, total  = len(df)):
                 url = article[3]
                 title = article[1]
                 date = article[0]
@@ -96,7 +97,7 @@ class Dataset():
         publisher = 'wikipedia'
         df = pd.read_csv('Wiki-Doc-Train.tsv', sep='\t')
 
-        for index, article in df.iterrows():
+        for index, article in tqdm(df.iterrows(),desc = 'Climatetext', total  = len(df)):
             title = article['title']
             sentence = article['sentence']
             if article['label'] == 1:
@@ -109,7 +110,7 @@ class Dataset():
 
         #TelevisionNews
         ds_id = 4
-        for file in os.listdir('./TelevisionNews'):
+        for file in tqdm(os.listdir('./TelevisionNews'), desc= 'TelevisionNews', total  = len(os.listdir('./TelevisionNews'))):
             df=pd.read_csv(f'./TelevisionNews/{file}')
             for index, article in df.iterrows():
                 url = article['URL']
@@ -122,7 +123,7 @@ class Dataset():
         #Labeled by trav
         ds_id = 5
         df =  pd.read_json('cards_training_sub_sub_claim.json')
-        for index, article in df.iterrows():
+        for index, article in tqdm(df.iterrows(),desc = 'Subsubclaim', total  = len(df)):
             claim = str(article['sub_claim'])[0]
             sub = article['sub_claim']
             subsub = article['sub_sub_claim']
@@ -137,7 +138,7 @@ class Dataset():
         #Miriams dataset
         ds_id = 6
         df = pd.read_csv('Climate_change_allyears_trim.csv')
-        for index, article in df.iterrows():
+        for index, article in tqdm(df.iterrows(),desc = 'Miriams set', total  = len(df)):
             title = article['Headline']
             date = article['Date']
             publisher = article['LP']
@@ -149,7 +150,7 @@ class Dataset():
         ds_id = 7
         for file in os.listdir('./data/training'):
             df = pd.read_csv(f'./data/training/{file}')
-            for index, article in df.iterrows():
+            for index, article in tqdm(df.iterrows(),desc = f'published cards {file}', total  = len(df)):
                 claim = article['claim'][0]
                 sub = article['claim'].replace('_','.')
                 if claim == str(0):
@@ -169,6 +170,6 @@ class Dataset():
         self.df.to_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)),'data','dataset.csv'),index=False)
 
 d = Dataset()
-d.download()
+#d.download()
 d.process()
 d.save()
