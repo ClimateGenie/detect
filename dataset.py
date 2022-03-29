@@ -1,4 +1,5 @@
 import pandas as pd
+import random
 import numpy as np
 import json
 from zipfile import ZipFile
@@ -39,6 +40,7 @@ mpp.Pool.istarmap = istarmap
 
 
 class Dataset():
+    print('Fetching Dataset')
     def __init__(self):
         self.sources = ['https://www.climate-news-db.com/download',
                         'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2015.csv.zip',
@@ -55,10 +57,11 @@ class Dataset():
                         ]
         self.dir = os.path.dirname(os.path.abspath(__file__))
         try:
-            self.df = pd.read_pickle(os.path.join(self.dir,'data','dataset.b2z'))
+            self.df = pd.read_pickle(os.path.join(self.dir,'data','dataset.pickle'))
         except FileNotFoundError:
-            self.df = pd.DataFrame(columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']) 
-            #self.download()
+            print('Dataset not found')
+            self.df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']) 
+            self.download()
             self.process()
             self.save()
 
@@ -93,7 +96,7 @@ class Dataset():
     def process(self):
 
         os.chdir(os.path.join(self.dir,'data','raw'))
-        pbar = tqdm(total=21, desc = 'Building Jobs', miniters = 1)
+        print("Building Process Pool")
         with Manager() as manager:
             L = manager.list()
 
@@ -101,17 +104,14 @@ class Dataset():
 
             df = pd.read_csv('climate-news-db-dataset.csv')
             data = data + [(L,sdf,1,self.subprocess1) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=1)
             
             for year in range(2015,2021):
                 df = pd.read_csv(f'WebNewsEnglishSnippets.{year}.csv',header = None)
                 data = data + [(L,sdf,2+(year-2015)*0.1,self.subprocess2) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=2)
 
 
             df = pd.read_csv('Wiki-Doc-Train.tsv', sep='\t')
             data = data + [(L,sdf,3,self.subprocess3) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=3)
 
             for file in os.listdir('./TelevisionNews'):
                 try:
@@ -120,36 +120,38 @@ class Dataset():
                 except:
                     pass
                 data = data + [(L,sdf,4,self.subprocess4)]
-            pbar.update(n=4)
 
             df =  pd.read_json('cards_training_sub_sub_claim.json') 
             data = data + [(L,sdf,5,self.subprocess5) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=5)
 
 
             df = pd.read_csv('Climate_change_allyears_trim.csv')
             data = data + [(L,sdf,6,self.subprocess6) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=6)
 
             for sub_ds_id,file in enumerate(os.listdir('./data/training')):
                 ds_id = 7 + 0.1*sub_ds_id
                 df = pd.read_csv(f'./data/training/{file}')
                 data = data + [(L,sdf,ds_id,self.subprocess7) for sdf in np.split(df, np.arange(1,round(len(df)/2500))*5000)]
-            pbar.update(n=7)
 
             pool=Pool()
-            for _ in tqdm(pool.istarmap(self.subprocess, data), total=len(data), miniters = 1, desc='Building Dataset'):
+            random.shuffle(data)
+            for _ in tqdm(pool.istarmap(self.subprocess, data), total=len(data), miniters = 10, desc='Building Dataset'):
                 pass
+            pool.close()
             pool.join()
 
+
+            print("Building DataFrame")
             self.df = pd.concat(L)
             
-            self.df['sentence'] = self.df['sentence'].str.replace(r'[^\w\s]+','')
+
+            print('Cleaning Feilds')
+            self.df['sentence'] = self.df['sentence'].str.replace(r'[^\w\s]+','', regex=True)
     
 
     def save(self):
         print('Pickling')
-        self.df.to_pickle(os.path.join(self.dir,'data','dataset.bz2'),index=False)
+        self.df.to_pickle(os.path.join(self.dir,'data','dataset.pickle'))
 
 
 
@@ -158,89 +160,94 @@ class Dataset():
         target(l,df,ds_id)
 
     def subprocess1(self,l,df,ds_id):
-            # Climate-news-dbo
-            # A collection of climate news
-            for index, article in df.iterrows():
-                    url = article['article_url']
-                    domain = article['newspaper_url']
-                    publisher = article['newspaper']
-                    date = article['date_published']
-                    title = article['headline']
-                    try:
-                        f = open("./article_body/" + article['article_id']+ ".txt", "r").read().split('.')
-                        l.append(pd.DataFrame([[ds_id,index,url,domain,publisher,date,None,title,f,True,None,None,None,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
-                    except FileNotFoundError:
-                        pass
+        # Climate-news-dbo
+        # A collection of climate news
+        for index, article in df.iterrows():
+                url = article['article_url']
+                domain = article['newspaper_url']
+                publisher = article['newspaper']
+                date = article['date_published']
+                title = article['headline']
+                try:
+                    f = open("./article_body/" + article['article_id']+ ".txt", "r").read().split('.')
+                    l.append(pd.DataFrame([[ds_id,url,domain,publisher,date,None,title,f,True,None,None,None,None]], columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+                except FileNotFoundError:
+                    pass
 
     def subprocess2(self,l,df,ds_id):
-            # WebNewsEnglishSnippets
-            for index, article in df.iterrows():
-                    url = article[3]
-                    title = article[1]
-                    date = article[0]
-                    sentence = str(article[4]).split('.')
-                    l.append(pd.DataFrame([[ds_id,index,url,None,None,date,None,title,sentence,True,None,None,None,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        # WebNewsEnglishSnippets
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['url'] = df[3]
+        target_df['title'] = df[1]
+        target_df['date'] = df[0]
+        target_df['sentence'] = df[4].str.split('.')
+        target_df['climate'] = True
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
 
 
     def subprocess3(self,l,df,ds_id):
-            # sustainablefinance
-            domain = 'https://en.wikipedia.org/'
-            publisher = 'wikipedia'
-            for index, article in df.iterrows():
-                    title = article['title']
-                    sentence = article['sentence']
-                    if article['label'] == 1:
-                        climate = True
-                    elif article['label'] == 0:
-                        climate = False
-                    elif article['label'] == -1:
-                        climate = None
-                    l.append(pd.DataFrame([[ds_id,index,None,domain,publisher,None,None,title,sentence,climate,None,None,None,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        # sustainablefinance
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['title'] = df['title']
+        target_df['domain'] = 'https://en.wikipedia.org/'
+        target_df['publisher'] = 'wikipedia'
+        target_df['climate'] = df['label'].apply(lambda x : bool(x))
+        target_df['sentence'] = df['sentence'].str.split('.')
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
 
     def subprocess4(self,l,df,ds_id):
-            #TelevisionNews
-                for index, article in df.iterrows():
-                    url = article['URL']
-                    date = article['MatchDateTime']
-                    publisher = article['Station']
-                    f = str(article['Snippet']).split('.')
-                    l.append(pd.DataFrame([[ds_id,file,url,None,publisher,date,None,None,f,True,None,None,None,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        #TelevisionNews
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['url'] = df['URL']
+        target_df['date'] = df['MatchDateTime']
+        target_df['publisher'] = df['Station']
+        target_df['climate'] = True
+        target_df['sentence'] = df['Snippet'].str.split('.')
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
+
 
     def subprocess5(self,l,df,ds_id):
-            #Labeled by trav
-            for index, article in df.iterrows():
-                    claim = str(article['sub_claim'])[0]
-                    sub = article['sub_claim']
-                    subsub = article['sub_sub_claim']
-                    f = str(article['Paragraph_Text']).split('.')
-                    if claim == str(0):
-                        binary = False
-                    else:
-                        binary = True
-                    l.append(pd.DataFrame([[ds_id,index,None,None,None,None,None,None,f,True,binary,claim,sub,subsub]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        #Labeled by trav
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['claim']=df['sub_claim'].apply(lambda x: str(x)[0])
+        target_df['sub']=df['sub_claim'].apply(lambda x: str(x)[-1])
+        target_df['subsub']=df['sub_sub_claim'].apply(lambda x: str(x)[-1])
+        target_df['binary'] = df['sub_claim'].apply(lambda x : True if str(x)[0] != '0' else False)
+        target_df['sentence'] = df['Paragraph_Text'].str.split('.')
+        target_df['climate'] = True
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
+
 
     def subprocess6(self,l,df,ds_id):
-            #Miriams dataset
-            ds_id = 6
-            df = pd.read_csv('Climate_change_allyears_trim.csv')
-            for index, article in df.iterrows():
-                    title = article['Headline']
-                    date = article['Date']
-                    publisher = article['LP']
-                    f = str(article['Paragraph']).split('.')
-                    l.append(pd.DataFrame([[ds_id,index,None,None,publisher,date,None,title,f,True,None,None,None,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        #Miriams dataset
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['title'] = df['Headline']
+        target_df['date'] = df['Date']
+        target_df['publisher'] = df['LP']
+        target_df['sentence'] = df['Parargraph'].str.split('.')
+        target_df['climate'] = True
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
 
     def subprocess7(self,l,df,ds_id):
         #Public Cards dataset
-        for index, article in df.iterrows():
-                claim = article['claim'][0]
-                sub = article['claim'].replace('_','.')
-                if claim == str(0):
-                    binary = False
-                else:
-                    binary = True
-                f = str(article['text']).split('.')
-                l.append(pd.DataFrame([[ds_id,index,None,None,None,None,None,None,f,True,binary,claim,sub,None]], columns = ['ds_id','ds_index','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
+        target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub'])
+        target_df['claim']=df['claim'].apply(lambda x: str(x)[0])
+        target_df['sub']=df['claim'].apply(lambda x: str(x)[-1])
+        target_df['binary'] = df['claim'].apply(lambda x : True if str(x)[0] != '0' else False)
+        target_df['climate'] = True
+        target_df['ds_id'] = ds_id
+        l.append(target_df.explode('sentence'))
 
-d = Dataset()
+    def subset(self, cols):
+        sub_df = self.df[cols].dropna()
+
+        return sub_df
+
+if __name__ == "__main__":
+    d = Dataset()
 
