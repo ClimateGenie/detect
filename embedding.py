@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import silhouette_score
 import gensim
 import nltk
+import os
 import logging
 import random
 from multiprocessing import Manager, Pool
@@ -10,20 +11,34 @@ import tqdm
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 logging.basicConfig(format='%(message)s', level=logging.INFO)
+import pickle
 
 
-d = Dataset()
+class Embedding():
 
-d.gather_embedding_training(sample = 0.3)
-d.gather_subclaim_data()
+    def __init__(self,training_data,dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
 
-model = gensim.models.doc2vec.Doc2Vec(vector_size=300)
+        self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
+        self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
+        self.training_data = training_data
 
-model.build_vocab(corpus_iterable = d.embedding_train)
+        if os.path.exists(self.pickle_path):
+            with open(self.pickle_path,'rb') as f:
+                self.model = pickle.load(f)
+        else:
+            self.model = gensim.models.doc2vec.Doc2Vec(vector_size=vect_size,dm=dm,window=window,hs=1,epochs = 3)
+            self.model.build_vocab(corpus_iterable = self.training_data)
+            self.model.train(self.training_data, total_examples=self.model.corpus_count, epochs=3)
+            with open(self.pickle_path,'wb') as f:
+                pickle.dump(self.model,f)
 
-model.train(d.embedding_train, total_examples=model.corpus_count, epochs=3)
 
-def find_closest(sentence, model = model):
-    inferred_vector = model.infer_vector(gensim.utils.simple_preprocess(sentence))
-    sims = model.dv.most_similar([inferred_vector], topn=1)
-    print(' '.join(d.embedding_train[sims[0][0]].words))
+    def find_closest(self,sentence):
+        inferred_vector = self.model.infer_vector(gensim.utils.simple_preprocess(sentence))
+        sims = self.model.dv.most_similar([inferred_vector], topn=1)
+        print(' '.join(self.training_data[sims[0][0]].words))
+
+if __name__ == "__main__":
+    d = Dataset()
+    d.gather_embedding_training(sample = 0.3)
+    e = Embedding(d.embedding_train)

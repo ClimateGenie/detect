@@ -51,7 +51,7 @@ class Dataset():
         else:
             print('Dataset not found')
             self.df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']) 
-            self.download()
+            #self.download()
             self.process()
             self.save()
 
@@ -255,7 +255,7 @@ class Dataset():
         if sample: 
             train = train.sample(frac = sample, random_state = self.state).reset_index()
         print(f'Processing Embedding Training Data, {len(train)} rows')
-        train['doc'] = train.apply(lambda x: gensim.models.doc2vec.TaggedDocument(gensim.utils.simple_preprocess(x['sentence']),[x.name]), axis = 1).values
+        train['doc'] = train.apply(lambda x: gensim.models.doc2vec.TaggedDocument(gensim.utils.simple_preprocess(x['sentence']),[x['ds_id']]), axis = 1).values
         train = train['doc'].values
         self.embedding_train = train
 
