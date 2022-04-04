@@ -43,12 +43,12 @@ mpp.Pool.istarmap = istarmap
 
 class Dataset():
     print('Fetching Dataset')
-    def __init__(self, state = 1 ):
+    def __init__(self, rebuild = False, state = 1 ):
         self.state = state
         self.dir = os.path.dirname(os.path.abspath(__file__))
-        try:
+        if os.path.exists(os.path.join(self.dir,'data','dataset.pickle')) and not rebuild:
             self.df = pd.read_pickle(os.path.join(self.dir,'data','dataset.pickle'))
-        except FileNotFoundError:
+        else:
             print('Dataset not found')
             self.df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']) 
             self.download()
@@ -144,7 +144,7 @@ class Dataset():
     def sent_token(self, sentence):
         if not isinstance(sentence,str):
             sentence = ""
-        return nltk.tokenize_sent_tokenize(sentence)
+        return nltk.tokenize.sent_tokenize(sentence)
 
     def subprocess(self,l,df,ds_id,target):
         target(l,df,ds_id)
@@ -160,7 +160,7 @@ class Dataset():
                 date = article['date_published']
                 title = article['headline']
                 try:
-                    f = nltk.tokenize.sent_tokenize(open("./article_body/" + article['article_id']+ ".txt", "r").read())
+                    f = self.sent_token(open("./article_body/" + article['article_id']+ ".txt", "r").read())
                     l.append(pd.DataFrame([[ds_id,url,domain,publisher,date,None,title,f,True,None,None,None,None]], columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']).explode('sentence'))
                 except FileNotFoundError:
                     pass
@@ -173,6 +173,8 @@ class Dataset():
         target_df['title'] = df[1]
         target_df['date'] = df[0]
         target_df['sentence'] = df[4].apply(self.sent_token)
+        target_df = target_df[target_df['sentence'].str.len() > 2]
+        target_df['sentence'] =  target_df['sentence'][1:-1]
         target_df['climate'] = True
         target_df['ds_id'] = ds_id
         l.append(target_df.explode('sentence'))
@@ -246,7 +248,7 @@ class Dataset():
         return sub_df
 
 
-    def gather_embedding_training(self,ds_array = [1,2,1,2.2,2.3,2.4,2.5], sample = None):
+    def gather_embedding_training(self,ds_array = [1,2,1,2.2,2.3,2.4,2.5,3,4,5,6,7.1,7.2,7.3], sample = None):
         print('Gathering Climate Claims')
         train =  self.subset(['ds_id','sentence','climate'])
         train = train[(train['climate'] == True) & (train['ds_id'].isin(ds_array))]
@@ -297,7 +299,7 @@ class Dataset():
         self.train_subsub, self.validate_subsub, self.test_subsub = np.split(arr, [int(split[1]*len(arr)), int(sum(split[0:2])*len(arr))])
 
 if __name__ == "__main__":
-    d = Dataset()
+    d = Dataset(rebuild = True)
     d.gather_subclaim_data()
     d.gather_subsub_data()
     d.gather_binary_data()
