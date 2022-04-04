@@ -12,7 +12,7 @@ import shutil
 import gensim
 from multiprocessing import Manager, Pool
 import pickle
-
+from kaggle.api.kaggle_api_extended import KaggleApi
 # istarmap.py for Python 3.8+
 import multiprocessing.pool as mpp
 
@@ -51,7 +51,7 @@ class Dataset():
         else:
             print('Dataset not found')
             self.df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','climate','binary','claim','sub','subsub']) 
-            #self.download()
+            self.download()
             self.process()
             self.save()
 
@@ -67,7 +67,7 @@ class Dataset():
             pass
         os.mkdir(os.path.join(self.dir,'data','raw'))
         os.chdir(os.path.join(self.dir,'data','raw'))
-        self.sources = ['https://www.climate-news-db.com/download', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2015.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2016.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2017.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2018.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2019.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2020.csv.zip', 'https://www.sustainablefinance.uzh.ch/dam/jcr:c4f6e427-6b84-41ca-a016-e66337fb283b/Wiki-Doc-Train.tsv', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/TelevisionNews.zip', 'https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS', 'https://drive.google.com/uc?export=download&id=1exilBtj1fnryC7xkoHjZ6YZPaRZHBtbP', 'http://socialanalytics.ex.ac.uk/cards/data.zip' ]
+        self.sources = ['https://www.climate-news-db.com/download', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2015.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2016.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2017.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2018.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2019.csv.zip', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/WebNewsEnglishSnippets.2020.csv.zip', 'https://www.sustainablefinance.uzh.ch/dam/jcr:c4f6e427-6b84-41ca-a016-e66337fb283b/Wiki-Doc-Train.tsv', 'http://data.gdeltproject.org/blog/2020-climate-change-narrative/TelevisionNews.zip', 'https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS', 'https://drive.google.com/uc?export=download&id=1exilBtj1fnryC7xkoHjZ6YZPaRZHBtbP', 'http://socialanalytics.ex.ac.uk/cards/data.zip','https://drive.google.com/uc?export=download&id=1IoTRrJNDJqvaG3hnUpnHQyGvPAJbO8y3','https://github.com/tfs4/liar_dataset/archive/refs/heads/master.zip']
         for url in self.sources:
             res = None
             while res is None:
@@ -77,6 +77,12 @@ class Dataset():
                     res = 1
                 except:
                     pass
+
+        api = KaggleApi()
+        api.authenticate()
+        self.kaggle_sources = [{ "name": 'News Category Dataset', "path":'rmisra/news-category-dataset'},  { "name": 'Fake and real news dataset', "path":'clmentbisaillon/fake-and-real-news-dataset'},  { "name": 'Getting Real about Fake News', "path":'mrisdal/fake-news'}, { "name": 'All the News', "path":'snapcrack/all-the-news'}, {"path":"ruchi798/source-based-news-classification"}
+        for source in self.kaggle_sources:
+            api.dataset_download_files(source["path"], quiet = False)
         for file in os.listdir():
             if '.zip' in file:
                 with ZipFile(file, 'r') as zipObj:
@@ -300,6 +306,3 @@ class Dataset():
 
 if __name__ == "__main__":
     d = Dataset(rebuild = True)
-    d.gather_subclaim_data()
-    d.gather_subsub_data()
-    d.gather_binary_data()
