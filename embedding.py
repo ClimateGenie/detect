@@ -16,11 +16,12 @@ import pickle
 
 class Embedding():
 
-    def __init__(self,training_data,dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
+    def __init__(self,training_data,tokenisation_function,dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
 
         self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
         self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
         self.training_data = training_data
+        self.tokenisation_function = tokenisation_function
 
         if os.path.exists(self.pickle_path):
             with open(self.pickle_path,'rb') as f:
@@ -34,11 +35,11 @@ class Embedding():
 
 
     def find_closest(self,sentence):
-        inferred_vector = self.model.infer_vector(gensim.utils.simple_preprocess(sentence))
+        inferred_vector = self.model.infer_vector(self.tokenisation_function(sentence))
         sims = self.model.dv.most_similar([inferred_vector], topn=1)
         print(' '.join(self.training_data[sims[0][0]].words))
 
 if __name__ == "__main__":
     d = Dataset()
     d.gather_embedding_training(sample = 0.3)
-    e = Embedding(d.embedding_train)
+    e = Embedding(d.embedding_train,d.word_token)
