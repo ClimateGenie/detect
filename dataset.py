@@ -11,33 +11,6 @@ import shutil
 import gensim
 from multiprocessing import Manager, Pool
 from kaggle.api.kaggle_api_extended import KaggleApi
-# istarmap.py for Python 3.8+
-import multiprocessing.pool as mpp
-
-
-def istarmap(self, func, iterable, chunksize=1):
-    """starmap-version of imap
-    """
-    self._check_running()
-    if chunksize < 1:
-        raise ValueError(
-            "Chunksize must be 1+, not {0:n}".format(
-                chunksize))
-
-    task_batches = mpp.Pool._get_tasks(func, iterable, chunksize)
-    result = mpp.IMapIterator(self)
-    self._taskqueue.put(
-        (
-            self._guarded_task_generation(result._job,
-                                          mpp.starmapstar,
-                                          task_batches),
-            result._set_length
-        ))
-    return (item for chunk in result for item in chunk)
-
-
-mpp.Pool.istarmap = istarmap
-
 
 class Dataset():
     print('Fetching Dataset')
@@ -145,13 +118,21 @@ class Dataset():
 
             pool=Pool()
             random.shuffle(data)
-            for _ in tqdm(pool.istarmap(self.subprocess, data), total=len(data), miniters = 5000, desc='Building Dataset'):
+            for _ in tqdm(pool.imap(self.subprocess, data), total=len(data), miniters = 5000, desc='Building Dataset'):
                 pass
             pool.close()
             pool.join()
 
+            pool=Pool()
+            random.shuffle(data)
+            for _ in tqdm(pool.imap(self.apply_token, L), total=len(L), miniters = 5000, desc='Tokenising'):
+                pass
+            pool.close()
+            pool.join()
+
+
             print("Building DataFrame")
-            self.df = pd.concat(L).apply(lambda x: self.apply_token(x), axis=1)
+            self.df = pd.concat(L)
             self.df.reset_index(inplace = True, drop = True)
             
 
@@ -169,8 +150,8 @@ class Dataset():
         return gensim.utils.simple_preprocess(sentence)
 
 
-    def subprocess(self,l,df,ds_id,target):
-        target(l,df,ds_id)
+    def subprocess(self,vars):
+        vars[3](vars[0],vars[1],vars[2])
 
 
     def apply_token(self,df):
