@@ -1,3 +1,5 @@
+from nltk import tag, tokenize
+from nltk.util import pr
 import pandas as pd
 import random
 import numpy as np
@@ -13,17 +15,23 @@ from multiprocessing import Manager, Pool
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 class Dataset():
-    print('Fetching Dataset')
-    def __init__(self, rebuild = False, state = 1 ):
+    def __init__(self, download = True, rebuild = False, save = True, state = 1 , dev = False):
+        print('Fetching Dataset')
         self.state = state
+        self.dev = dev
+        if dev:
+            rebuild = True
+            save = False
         self.dir = os.path.dirname(os.path.abspath(__file__))
         if os.path.exists(os.path.join(self.dir,'data','dataset.pickle')) and not rebuild:
             self.df = pd.read_pickle(os.path.join(self.dir,'data','dataset.pickle'))
         else:
             print('Dataset not found')
-            #self.download()
+            if download:
+                self.download()
             self.process()
-            self.save()
+            if save:
+                self.save()
 
     def download(self):
         try:
@@ -118,14 +126,15 @@ class Dataset():
 
             pool=Pool()
             random.shuffle(data)
-            for _ in tqdm(pool.imap(self.subprocess, data), total=len(data), miniters = 5000, desc='Building Dataset'):
-                pass
-            pool.close()
-            pool.join()
+            if self.dev:
+                tags = np.unique(np.array(data, dtype=object).T[2])
+                d = []
+                for t in tags:
+                    index = np.where(np.array(data, dtype=object).T[2] == float(t))[0][0]
+                    d.append(data[index])
 
-            pool=Pool()
-            random.shuffle(data)
-            for _ in tqdm(pool.imap(self.apply_token, L), total=len(L), miniters = 5000, desc='Tokenising'):
+                data = d
+            for _ in tqdm(pool.imap(self.subprocess, data), total=len(data), miniters = 5000, desc='Building Dataset'):
                 pass
             pool.close()
             pool.join()
@@ -185,7 +194,7 @@ class Dataset():
             else:
                 target_df.loc[index,'sentence']= None
 
-        l.append(target_df[target_df['sentence'] != None].explode('sentence'))
+        l.append(self.apply_token(target_df[target_df['sentence'] != None].explode('sentence')))
 
     def subprocess2(self,l,df,ds_id):
         # WebNewsEnglishSnippets
@@ -199,7 +208,7 @@ class Dataset():
         target_df['soft_climate'] = True
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
 
     def subprocess3(self,l,df,ds_id):
@@ -213,7 +222,7 @@ class Dataset():
         target_df['sentence'] = df['sentence'].apply(self.sent_token)
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
     def subprocess4(self,l,df,ds_id):
         df = df[~df.isnull()]
@@ -226,7 +235,7 @@ class Dataset():
         target_df['sentence'] = df['Snippet'].apply(self.sent_token)
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
 
     def subprocess5(self,l,df,ds_id):
@@ -241,7 +250,7 @@ class Dataset():
         target_df['soft_climate'] = True
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
 
     def subprocess6(self,l,df,ds_id):
@@ -255,7 +264,7 @@ class Dataset():
         target_df['soft_climate'] = True
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
     def subprocess7(self,l,df,ds_id):
         df = df[~df.isnull()]
@@ -268,7 +277,7 @@ class Dataset():
         target_df['soft_climate'] = True
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
 
     def subprocess8(self,l,df,ds_id):
@@ -280,7 +289,7 @@ class Dataset():
         target_df['date'] = df['date']
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
 
     def subprocess9(self,l,df,ds_id):
@@ -296,7 +305,7 @@ class Dataset():
             target_df['ds_id'] = ds_id
             target_df['soft_climate'] = df['category'].apply(lambda x : True if x == 'ENVIROMENT' else False)
             target_df['doc_len'] = target_df['sentence'].str.len()
-            l.append(target_df.explode('sentence'))
+            l.append(self.apply_token(target_df.explode('sentence')))
         except:
             pass
 
@@ -311,7 +320,7 @@ class Dataset():
         target_df['binary'] = True
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
     def subprocess11(self,l,df,ds_id):
         target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','doc_len','soft_climate','true_climate','binary','claim','sub','subsub'])
@@ -323,7 +332,7 @@ class Dataset():
         target_df['url'] = df['url']
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
 
     def subprocess12(self,l,df,ds_id):
         target_df = pd.DataFrame(columns = ['ds_id','url','domain','publisher','date','author','title','sentence','doc_len','soft_climate','true_climate','binary','claim','sub','subsub'])
@@ -336,7 +345,7 @@ class Dataset():
         target_df['binary'] = df['label'].apply(lambda x : True if x == 'Fake' else False)
         target_df['ds_id'] = ds_id
         target_df['doc_len'] = target_df['sentence'].str.len()
-        l.append(target_df.explode('sentence'))
+        l.append(self.apply_token(target_df.explode('sentence')))
         
 
     def subset(self, cols):
@@ -354,7 +363,5 @@ class Dataset():
         print(f'Processing Embedding Training Data, {len(train)} rows')
         self.embedding_train = train.apply(lambda x: gensim.models.doc2vec.TaggedDocument(x['sentence'],[x.name]), axis = 1).values
 
-
-if __name__ == "__main__":
-    d = Dataset(rebuild = True)
-    print(d.df.groupby(['ds_id']).count())
+if __name__ == '__main__':
+    d = Dataset(dev=True, download=False)
