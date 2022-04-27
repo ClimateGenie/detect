@@ -1,7 +1,9 @@
 import numpy as np
+from tqdm import tqdm
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
 from dataset import Dataset
+from multiprocessing import Pool, Manager
+import gensim
 
 """
 
@@ -28,26 +30,41 @@ parameters for this model ->
 """
 
 def main(df,a):
-    tokens = df['sentence'].values
-    probabilities =  df.apply(lambda x: 1/(x['doc_len']**1/a),axis = 1)
-    dic = []
-    num_pro = []
-    num_neg = []
-    for index, token_set in enumerate(tokens):
-        print(token_set)
+    ## Do an initial claisifcation model using hard_climate labels
+    known_df = df[df['true_climate'] == True]
+    flat = [item for sublist in known_df['sentence'] for item in sublist]
+    dic = {x:[] for x in set(flat)}
+    tokens = known_df['sentence'].values
+    probabilities =  df.apply(lambda x: convert_prob(x,a),axis = 1)
+    for index, token_set in tqdm(enumerate(tokens), total=len(tokens)):
         for word in token_set:
-            if word in dic:
-                num_pro[dic.index(word)] += probabilities[index] 
-                num_neg[dic.index(word)] += 1-probabilities[index] 
+            dic[word].append(probabilities[index])
+    return dic
 
 
 if __name__ == "__main__":
-
-    d=Dataset()
-
-    main(d.df,1)
+    d=Dataset(dev = True, download=False)
+    dic = main(d.df,100000)
+    neg_dic =  {}
+    for key in dic.keys():
+        neg_dic[key] = sum([ 1-x for x in dic[key]])
+        dic[key] = sum(dic[key])
+    sum_pro = sum(dic.values())
+    sum_neg = sum(neg_dic.values())
+    pr = {}
+    for key in dic.keys():
+        dic[key] = (dic[key] + 1)/(sum_pro+3)
+        neg_dic[key] = (neg_dic[key]+1)/(sum_neg+3)
+        pr[key] = dic[key]/(dic[key]+ neg_dic[key])
     
-    d.df.apply()
+    
+def find_sen(sen, pr):
+    a = sum([pr[x] for x in gensim.utils.simple_preprocess(sen)])
+    b = sum([1-pr[x] for x in gensim.utils.simple_preprocess(sen)])
+    prob = a/(a+b)
+    return prob
 
-    d.df['doc_len']
-
+def convert_prob(row,a):
+    if row['soft_climate'] == True:
+        return 1/(row['doc_len']**1/a)
+    elif row['soft_climate'] == False:""

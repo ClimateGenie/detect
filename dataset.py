@@ -1,5 +1,3 @@
-from nltk import tag, tokenize
-from nltk.util import pr
 import pandas as pd
 import random
 import numpy as np
@@ -32,6 +30,7 @@ class Dataset():
             self.process()
             if save:
                 self.save()
+        os.chdir(self.dir)
 
     def download(self):
         try:
@@ -124,7 +123,7 @@ class Dataset():
             df = pd.read_csv('news_articles.csv')
             data = data + [(L,sdf,12,self.subprocess12) for sdf in np.split(df, np.arange(1,round(len(df)/5000))*5000)]
 
-            pool=Pool()
+            pool=Pool(1)
             random.shuffle(data)
             if self.dev:
                 tags = np.unique(np.array(data, dtype=object).T[2])
@@ -143,6 +142,7 @@ class Dataset():
             print("Building DataFrame")
             self.df = pd.concat(L)
             self.df.reset_index(inplace = True, drop = True)
+        
             
 
     def save(self):
@@ -169,8 +169,19 @@ class Dataset():
         tokens = df['sentence'].apply(lambda x: self.word_token(x))
         df = df[tokens.str.len() > 1]
         df = df.assign(sentence = tokens)    
+
+        df.iloc[df['soft_climate'] == False, 'true_climate'] = 0
+        df.iloc[df['soft_climate'] == True and df['doc_len'] == 1, 'true_climate'] = 1
         return df
 
+    def hard_climate(self, row):
+        if row['soft_climate'] == False:
+            return 0
+        elif row['soft_climate'] == True and row['doc_len'] == 1:
+            return 1
+        else:
+            return np.NaN
+        
     def subprocess1(self,l,df,ds_id):
         # Climate-news-dbo
         # A collection of climate news
