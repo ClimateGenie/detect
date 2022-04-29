@@ -1,30 +1,16 @@
-import pickle
-from nltk import text
+import dill
 import pandas as pd
 import newspaper
-import random
-import numpy as np
-from zipfile import ZipFile
 import nltk
-from newspaper import Article
-from pandas.core.frame import DataFrame
-from requests.models import Response
-import wget
 from tqdm import tqdm 
+from multiprocessing import Pool
 import os
-import shutil
 import gensim
-from multiprocessing import Manager, Pool
-from kaggle.api.kaggle_api_extended import KaggleApi
 import requests
-import time
-import re
-import collections
-import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta, timezone
-from itertools import repeat
+from datetime import datetime, timedelta
 import pytz
+from dataset import *
 
 
 class Dataset():
@@ -58,6 +44,11 @@ class Dataset():
             self.df_climate = pd.concat([self.df_climate,pd.DataFrame(flatten(climate_urls))])
             self.df_news = pd.concat([self.df_climate,pd.DataFrame(flatten(news_urls))])
             self.df_skeptics = pd.concat([self.df_climate,pd.DataFrame(flatten(climateskeptics_urls))])
+
+            self.df_climate['article'] = simple_map(self.get_articles, self.df_climate['media_url'])
+            self.df_news['article'] = simple_map(self.get_articles, self.df_news['media_url'])
+            self.df_skeptics['article'] = simple_map(self.get_articles, self.df_skeptics['media_url'])
+
             self.save()
 
 
@@ -73,25 +64,26 @@ class Dataset():
 
 
     def get_articles(self,url):
-        try:
-            a = newspaper.Article(url)
-            a.download()
-            a.parse()
-            return a
-        except newspaper.article.ArticleException:
-            None
+        if not any(sub in url for sub in ['reddit', 'youtube'] ):
+            try:
+                a = newspaper.Article(url)
+                a.download()
+                a.parse()
+                return a.text
+            except newspaper.article.ArticleException:
+                None
 
 
     def save(self):
         print('Pickling')
         with open(os.path.join('picklejar','dataset.pickle'), 'wb') as f:
-            pickle.dump(self.__dict__,f,2)
+            dill.dump(self.__dict__,f,2)
 
 
     def load(self):
         print('Unpickling')
         with open(os.path.join('picklejar','dataset.pickle'), 'rb') as f:
-            tmp_dic = pickle.load(f)
+            tmp_dic = dill.load(f)
             self.__dict__.clear()
             self.__dict__.update(tmp_dic)
 
@@ -110,6 +102,13 @@ def flatten(ls):
 def simple_starmap(func, ls):
     pool = Pool()
     out = pool.starmap(func,ls)
+    pool.close()
+    pool.join()
+    return out
+
+def simple_map(func, ls):
+    pool = Pool()
+    out = [x for x in tqdm(pool.imap(func,ls), total= len(ls))]
     pool.close()
     pool.join()
     return out
