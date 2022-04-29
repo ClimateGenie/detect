@@ -14,7 +14,7 @@ from dataset import *
 
 
 class Dataset():
-    def __init__(self, download = True, rebuild = False, save = True, state = 1 , dev = False):
+    def __init__(self, from_date = datetime(2022,4,20)):
         try:
             self.load()
         except FileNotFoundError:
@@ -24,7 +24,7 @@ class Dataset():
             self.df_skeptics = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score'])
 
         utc = pytz.UTC
-        day = utc.localize(datetime(2022,4,25))
+        day = utc.localize(from_date)
         new_timestamps = []
         while day < utc.localize(datetime.utcnow()-timedelta(days = 1)):
             if day.timestamp() in self.timestamps:
