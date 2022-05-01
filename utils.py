@@ -1,7 +1,7 @@
 import nltk
 import gensim
 from multiprocessing import Pool
-from tdqm import tdqm
+from tqdm import tqdm
 
 
 
@@ -11,6 +11,8 @@ def sent_token(doc):
     return nltk.tokenize.sent_tokenize(doc)
 
 def word_token(sentence):
+    if not isinstance(sentence,str):
+        sentence = ""
     return gensim.utils.simple_preprocess(sentence)
 
 def flatten(ls):

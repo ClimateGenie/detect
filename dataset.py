@@ -1,4 +1,5 @@
 import dill
+import numpy as np
 import pandas as pd
 import newspaper
 import nltk
@@ -8,13 +9,15 @@ import os
 import gensim
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 from dataset import *
+import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime(2022,4,20)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=1)):
+        warnings.filterwarnings('ignore')
         try:
             self.load()
         except FileNotFoundError:
@@ -39,15 +42,25 @@ class Dataset():
             print('Fetching for ' + ', '.join([datetime.fromtimestamp(x).strftime('%Y-%m-%d') for x in new_timestamps]))
 
             climate_urls = simple_starmap(self.get_links, [(date,'climate') for date in new_timestamps])
-            news_urls = simple_starmap(self.get_links, [(date,'news') for date in new_timestamps])
+            news_urls = flatten([simple_starmap(self.get_links, [(date,'news') for date in new_timestamps]),simple_starmap(self.get_links, [(date,'worldnews') for date in new_timestamps])])
             climateskeptics_urls = simple_starmap(self.get_links, [(date,'climateskeptics') for date in new_timestamps])
-            self.df_climate = pd.concat([self.df_climate,pd.DataFrame(flatten(climate_urls))])
-            self.df_news = pd.concat([self.df_climate,pd.DataFrame(flatten(news_urls))])
-            self.df_skeptics = pd.concat([self.df_climate,pd.DataFrame(flatten(climateskeptics_urls))])
+            df_climate = pd.DataFrame(flatten(climate_urls),columns= ['author','timestamp','post_url','media_url','score'])
+            df_news = pd.DataFrame(flatten(news_urls),columns= ['author','timestamp','post_url','media_url','score'])
+            df_skeptics = pd.DataFrame(flatten(climateskeptics_urls),columns= ['author','timestamp','post_url','media_url','score'])
 
-            self.df_climate['article'] = simple_map(self.get_articles, self.df_climate['media_url'])
-            self.df_news['article'] = simple_map(self.get_articles, self.df_news['media_url'])
-            self.df_skeptics['article'] = simple_map(self.get_articles, self.df_skeptics['media_url'])
+
+            df_climate['article'] = simple_map(self.get_articles, df_climate['media_url'])
+            df_news['article'] = simple_map(self.get_articles, df_news['media_url'])
+            df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'])
+
+            df_climate.index = np.arange(len(self.df_climate), len(df_climate) + len(self.df_climate))
+            df_news.index = np.arange(len(self.df_news), len(df_news) + len(self.df_news))
+            df_skeptics.index = np.arange(len(self.df_skeptics), len(df_skeptics) + len(self.df_skeptics))
+
+
+            self.df_climate = pd.concat([self.df_climate,df_climate])
+            self.df_news = pd.concat([self.df_news,df_news])
+            self.df_skeptics = pd.concat([self.df_skeptics,df_skeptics])
 
             self.save()
 
@@ -114,4 +127,4 @@ def simple_map(func, ls):
     return out
 
 if __name__ == '__main__':
-    d = Dataset(dev=True, download=False)
+    d = Dataset()
