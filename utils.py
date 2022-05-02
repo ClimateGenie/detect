@@ -15,6 +15,7 @@ def word_token(sentence):
         sentence = ""
     return gensim.utils.simple_preprocess(sentence)
 
+
 def flatten(ls):
     return [item for sublist in ls for item in sublist]
 
