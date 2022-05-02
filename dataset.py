@@ -5,18 +5,20 @@ import newspaper
 import nltk
 from tqdm import tqdm 
 from multiprocessing import Pool
+from itertools import starmap
 import os
+from time import sleep
 import gensim
 import requests
 import pandas as pd
-from datetime import datetime, timedelta, date
+from datetime import datetime, time, timedelta, date
 import pytz
 from dataset import *
 import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=8)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=10)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -41,9 +43,10 @@ class Dataset():
         if len(new_timestamps):
             print('Fetching for ' + ', '.join([datetime.fromtimestamp(x).strftime('%Y-%m-%d') for x in new_timestamps]))
 
-            climate_urls = simple_starmap(self.get_links, [(date,'climate') for date in new_timestamps])
-            news_urls = flatten([simple_starmap(self.get_links, [(date,'news') for date in new_timestamps]),simple_starmap(self.get_links, [(date,'worldnews') for date in new_timestamps])])
-            climateskeptics_urls = simple_starmap(self.get_links, [(date,'climateskeptics') for date in new_timestamps])
+            climate_urls = starmap(self.get_links, [(date,'climate') for date in new_timestamps])
+            news_urls = flatten([starmap(self.get_links, [(date,'news') for date in new_timestamps]),starmap(self.get_links, [(date,'worldnews') for date in new_timestamps])])
+            climateskeptics_urls = starmap(self.get_links, [(date,'climateskeptics') for date in new_timestamps])
+
             df_climate = pd.DataFrame(flatten(climate_urls),columns= ['author','timestamp','post_url','media_url','score'])
             df_news = pd.DataFrame(flatten(news_urls),columns= ['author','timestamp','post_url','media_url','score'])
             df_skeptics = pd.DataFrame(flatten(climateskeptics_urls),columns= ['author','timestamp','post_url','media_url','score'])
@@ -56,7 +59,6 @@ class Dataset():
             df_climate.index = np.arange(len(self.df_climate), len(df_climate) + len(self.df_climate))
             df_news.index = np.arange(len(self.df_news), len(df_news) + len(self.df_news))
             df_skeptics.index = np.arange(len(self.df_skeptics), len(df_skeptics) + len(self.df_skeptics))
-
 
             self.df_climate = pd.concat([self.df_climate,df_climate])
             self.df_news = pd.concat([self.df_news,df_news])
@@ -73,6 +75,7 @@ class Dataset():
             r = requests.get(url)
             res = r.status_code
         data = r.json()['data']
+        sleep(0.3)
         return [{'author':x['author'],'timestamp': x['created_utc'],'post_url':x['full_link'], 'media_url':x['url'], 'score':x['score']} for x in data]
 
 
@@ -101,30 +104,6 @@ class Dataset():
             self.__dict__.update(tmp_dic)
 
 
-def sent_token(doc):
-    if not isinstance(doc,str):
-        doc = ""
-    return nltk.tokenize.sent_tokenize(doc)
-
-def word_token(sentence):
-    return gensim.utils.simple_preprocess(sentence)
-
-def flatten(ls):
-    return [item for sublist in ls for item in sublist]
-
-def simple_starmap(func, ls):
-    pool = Pool()
-    out = pool.starmap(func,ls)
-    pool.close()
-    pool.join()
-    return out
-
-def simple_map(func, ls):
-    pool = Pool()
-    out = [x for x in tqdm(pool.imap(func,ls), total= len(ls))]
-    pool.close()
-    pool.join()
-    return out
 
 if __name__ == '__main__':
     d = Dataset()
