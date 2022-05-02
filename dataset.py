@@ -16,7 +16,7 @@ import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=1)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=8)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -84,7 +84,7 @@ class Dataset():
                 a.parse()
                 return a.text
             except newspaper.article.ArticleException:
-                None
+                return None
 
 
     def save(self):
