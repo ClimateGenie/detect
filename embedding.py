@@ -31,6 +31,8 @@ class Embedding():
         self.save()
 
 
+
+
     def find_closest(self,sentence, num = 1, print_out = False):
         inferred_vector = self.model.infer_vector(word_token(sentence))
         sims = self.model.dv.most_similar([inferred_vector], topn=num)

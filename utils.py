@@ -1,9 +1,11 @@
 import time
+import hashlib
 import collections
 import nltk
 import gensim
 from multiprocessing import Pool
 from tqdm import tqdm
+from uuid  import UUID
 
 
 
@@ -34,3 +36,11 @@ def simple_map(func, ls):
     pool.close()
     pool.join()
     return out
+
+def uuid(values):
+    values = ''.join([ str(x) for x in values])
+    seed = int(hashlib.sha256(values.encode('utf-8')).hexdigest(), 16) % 2**127
+    return UUID(int=seed)
+
+
+
