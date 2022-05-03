@@ -1,3 +1,5 @@
+import time
+import collections
 import nltk
 import gensim
 from multiprocessing import Pool
@@ -32,4 +34,3 @@ def simple_map(func, ls):
     pool.close()
     pool.join()
     return out
-
