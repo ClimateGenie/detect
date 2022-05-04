@@ -16,7 +16,7 @@ import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=10)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=52)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
