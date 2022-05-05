@@ -16,7 +16,7 @@ class Embedding():
 
         self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
         self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
-        self.training_data = [gensim.models.doc2vec.TaggedDocument(word_token(x),[i]) for i,x in enumerate(training_data)]
+        self.training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in enumerate(training_data)]
         [self.vect_size, self.dm, self.window, self.hs, self.epochs] = [vect_size, dm, window, hs, epochs] 
         try:
             self.load()

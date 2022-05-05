@@ -16,7 +16,7 @@ import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=2)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(days=3)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -57,8 +57,8 @@ class Dataset():
 
 
             df_climate['uuid'] = simple_map(uuid, df_climate['post_url'])
-            df_news['uuid'] = simple_map(uuid, df_climate['post_url'])
-            df_skeptics['uuid'] = simple_map(uuid, df_climate['post_url'])
+            df_news['uuid'] = simple_map(uuid, df_news['post_url'])
+            df_skeptics['uuid'] = simple_map(uuid, df_skeptics['post_url'])
 
             df_climate.set_index(['uuid'], inplace=True)
             df_news.set_index(['uuid'], inplace=True)
@@ -121,9 +121,8 @@ class Dataset():
             self.__dict__.update(tmp_dic)
 
     def vectorise(self, embedding_scheme):
-        df = self.df_sentence.copy()
-        df['vector'] = simple_map(embedding_scheme.vectorise, df['sentence'])
-        return df
+        self.df_filtered['vector'] = simple_map(embedding_scheme.vectorise, self.df_filtered['sentence'])
+        return self.df_filtered
 
     
     def climate_words(self):
@@ -131,14 +130,14 @@ class Dataset():
 
 
     def news_words(self):
-        return flatten(simple_map(word_token,d.df_news['article']))
+        return flatten(simple_map(word_token,self.df_news['article']))
 
 
     def filter_for_climate(self, filter, threshold = 0.9):
         df = self.df_sentence.copy()
         df['prob'] = simple_map(filter.prob, df['sentence'])
-        df = df[df['prob']>threshold]
-        return df
+        self.df_filtered = df[df['prob']>threshold]
+        return self.df_filtered
 
         
 

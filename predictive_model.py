@@ -15,15 +15,10 @@ from keras.utils import to_categorical
 
 
 class Model():
-    def __init__(training_data):
-        X = df[]
+    def __init__(self,training_data):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=40)
 
 
-if __name__ == "__main__":
-    d = Dataset()
-    e = Embedding()
-    labeled_data = d.fetch_labeled_data(e)
     
 
 

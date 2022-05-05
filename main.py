@@ -1,17 +1,20 @@
 from dataset import Dataset
 from embedding import Embedding
 from filter import Filter
+from predictive_model im import Model
 from utils import simple_map, word_token
 
 
 d = Dataset()
 
 climate_words = d.climate_words()
-news_words = d.news_words
+news_words = d.news_words()
 f = Filter(climate_words,news_words)
 
 
 
-training_data = d.filter_for_climate(f)['sentence'].apply(word_token).values
+training_data = d.filter_for_climate(f)['sentence'].apply(word_token).values.tolist()
 e = Embedding(training_data)
-d.vectorise(e)
+vects = d.vectorise(e)
+
+m = Model

@@ -38,9 +38,8 @@ def simple_map(func, ls):
     return out
 
 def uuid(values):
-    values = ''.join([ str(x) for x in values])
+    values = ''.join([str(x) for x in values])
     seed = int(hashlib.sha256(values.encode('utf-8')).hexdigest(), 16) % 2**127
-    print(UUID(int=seed))
     return UUID(int=seed)
 
 
