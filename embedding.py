@@ -12,7 +12,7 @@ import pickle
 
 class Embedding():
 
-    def __init__(self,training_data,dm=0,vect_size=200,window = 5, hs = 1, epochs = 20):
+    def __init__(self,training_data,dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
 
         self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
         self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
@@ -30,11 +30,14 @@ class Embedding():
         self.model.train(self.training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
         self.save()
 
+    def vectorise(self,sentence):
+        return  self.model.infer_vector(word_token(sentence))
+
 
 
 
     def find_closest(self,sentence, num = 1, print_out = False):
-        inferred_vector = self.model.infer_vector(word_token(sentence))
+        inferred_vector = self.vectorise(sentence)
         sims = self.model.dv.most_similar([inferred_vector], topn=num)
         if print_out:
             for i in range(len(sims)):
@@ -79,3 +82,4 @@ if __name__ == "__main__":
     training_data = flatten(flatten([simple_map(sent_token,d.df_climate['article']), simple_map(sent_token, d.df_skeptics['article'])]))
     e = Embedding(training_data)
     e.eye_test()
+    d.vectorise(e)

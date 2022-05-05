@@ -16,7 +16,7 @@ import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=52)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=2)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -30,7 +30,7 @@ class Dataset():
         utc = pytz.UTC
         day = utc.localize(from_date)
         new_timestamps = []
-        while day < utc.localize(datetime.utcnow()-timedelta(days = 1)):
+        while day < utc.localize(datetime.utcnow()-timedelta(days = 2)):
             if day.timestamp() in self.timestamps:
                 day += timedelta(days =1)
             else:
@@ -56,9 +56,9 @@ class Dataset():
             df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'])
 
 
-            df_climate['uuid'] = df_climate.apply(lambda x: uuid(x[['post_url']]),axis = 1)
-            df_news['uuid'] = df_news.apply(lambda x: uuid(x[['post_url']]),axis = 1)
-            df_skeptics['uuid'] = df_skeptics.apply(lambda x: uuid(x[['post_url']]), axis = 1)
+            df_climate['uuid'] = simple_map(uuid, df_climate['post_url'])
+            df_news['uuid'] = simple_map(uuid, df_climate['post_url'])
+            df_skeptics['uuid'] = simple_map(uuid, df_climate['post_url'])
 
             df_climate.set_index(['uuid'], inplace=True)
             df_news.set_index(['uuid'], inplace=True)
@@ -68,7 +68,7 @@ class Dataset():
             self.df_news = pd.concat([self.df_news,df_news])
             self.df_skeptics = pd.concat([self.df_skeptics,df_skeptics])
 
-            df_sentence = pd.concat([df_climate,df_news,df_skeptics])
+            df_sentence = pd.concat([df_climate,df_skeptics,df_news])
             df_sentence = df_sentence[df_sentence['article'] != None]
             df_sentence['sentence'] = df_sentence['article'].apply(lambda x: sent_token(x))
             df_sentence['new_ind'] = df_sentence['sentence'].apply(lambda x: [i for i in range(len(x))])
@@ -120,7 +120,27 @@ class Dataset():
             self.__dict__.clear()
             self.__dict__.update(tmp_dic)
 
+    def vectorise(self, embedding_scheme):
+        df = self.df_sentence.copy()
+        df['vector'] = simple_map(embedding_scheme.vectorise, df['sentence'])
+        return df
 
+    
+    def climate_words(self):
+        return flatten(flatten([simple_map(word_token,self.df_climate['article']), simple_map(word_token, self.df_skeptics['article'])]))
+
+
+    def news_words(self):
+        return flatten(simple_map(word_token,d.df_news['article']))
+
+
+    def filter_for_climate(self, filter, threshold = 0.9):
+        df = self.df_sentence.copy()
+        df['prob'] = simple_map(filter.prob, df['sentence'])
+        df = df[df['prob']>threshold]
+        return df
+
+        
 
 if __name__ == '__main__':
     d = Dataset()
