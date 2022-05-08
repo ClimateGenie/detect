@@ -1,5 +1,6 @@
 from time import sleep
 import dill
+from pandas.core.algorithms import isin
 from utils import *
 import numpy as np
 import pandas as pd
@@ -16,7 +17,7 @@ import warnings
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(days=3)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=2)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -139,6 +140,16 @@ class Dataset():
         self.df_filtered = df[df['prob']>threshold]
         return self.df_filtered
 
+    def apply_labels(self):
+        self.df_labels = pd.DataFrame(columns=['class'])
+        self.df_filtered = self.df_filtered.join(self.df_labels, how = 'inner')
+
+    def predict_unlabeled(self, model):
+        self.df_filtered['predicted'] = model.predict(self.df_filtered['sentence'])
+
+
+
+        
         
 
 if __name__ == '__main__':
