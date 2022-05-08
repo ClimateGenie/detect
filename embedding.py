@@ -33,11 +33,6 @@ class Embedding():
     def vectorise(self,sentence):
         return  self.model.infer_vector(word_token(sentence))
 
-
-    def vectorise_df(self, df):
-        df['vector'] = simple_map(self.vectorise, df['sentence'])
-        return df
-
     def find_closest(self,sentence, num = 1, print_out = False):
         inferred_vector = self.vectorise(sentence)
         sims = self.model.dv.most_similar([inferred_vector], topn=num)

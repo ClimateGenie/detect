@@ -1,4 +1,5 @@
 from time import sleep
+from scipy.stats.distributions import entropy
 import dill
 from pandas.core.algorithms import isin
 from utils import *
@@ -141,11 +142,36 @@ class Dataset():
         return self.df_filtered
 
     def apply_labels(self):
-        self.df_labels = pd.DataFrame(columns=['class'])
-        self.df_filtered = self.df_filtered.join(self.df_labels, how = 'inner')
+        if os.path.exists('labels.csv'):
+            self.df_labels = pd.read_csv('labels.csv', index_col=0)
+            self.df_labels = pd.DataFrame(columns=['class'])
+            self.df_filtered['predicted'] =  pd.Series([[0]] * len(self.df_filtered))
+            self.get_labels()
+        self.df_filtered['class'] = -1
+        self.df_filtered = self.df_filtered.join(self.df_labels, how = 'outter')
 
     def predict_unlabeled(self, model):
-        self.df_filtered['predicted'] = model.predict(self.df_filtered['sentence'])
+        labels = model.model.label_distributions_
+        vectors = model.model.X_
+        df_vect_pred = pd.DataFrame([vectors,labels], columns=['vector', 'predicted'])
+        self.df_filtered = self.df_filtered.merge(df_vect_pred) 
+
+    def get_labels(self, n=10):
+        self.df_filtered['entropy'] = entropy(self.df_filtered['predicted'])
+        to_label = self.df_filtered[self.df_filtered.index.isin(self.df_skeptics.index)].sort(['entropy']).iloc[:n]
+        for index, row in to_label.itterows:
+            label = input(row['sentence'].values + '\n')
+            self.df_labels.loc[index] = [label]
+        self.df_labels.to_csv('labels.csv')
+        
+
+
+
+
+
+
+
+        
 
 
 
