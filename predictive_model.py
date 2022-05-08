@@ -1,8 +1,7 @@
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.utils import to_categorical 
-
-
+from sklearn.metrics import classification_report # for model evaluation metrics
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay # for showing confusion matrix
+from sklearn.preprocessing import MinMaxScaler # for feature scaling
+from sklearn.semi_supervised import LabelPropagation, LabelSpreading
 
 class Model():
     def __init__(self,training_data):
@@ -12,15 +11,7 @@ class Model():
         print(self.Y.shape)
         self.train()
     
-    def train(self):
-        self.model = Sequential()
-        self.model.add(Dense(500, activation='relu', input_dim=self.X.shape[1]))
-        self.model.add(Dense(100, activation='relu'))
-        self.model.add(Dense(50, activation='relu'))
-        self.model.add(Dense(Y.shape[1], activation='softmax'))
-    
-        self.model.fit(self.X, Y, epochs=20)
+    def train(self, model_class = LabelPropagation, kernel='rbf', gamma=20, n_neighbors=7, max_iter=30, tol=0.001, n_jobs=-1):
+        model = model_class(kernel=kernel, gamma=gamma, n_neighbors=n_neighbors,max_iter=max_iter, tol=tol, n_jobs=n_jobs)
 
-    def infer_df(self,df):
-        df['prediction'] = self.model.predict(df['vector'])
-        return df
+        self.model = model.fit(self.X, self.Y)
