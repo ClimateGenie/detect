@@ -6,11 +6,12 @@ from collections import Counter
 import dill
 
 class Filter():
-    def __init__(self,target_words,general_words, min_count = 100):
+    def __init__(self,target_words= None,general_words = None,load = False, min_count = 100):
 
         self.target_words = target_words
         self.general_words = general_words
         self.min_count = min_count
+        self.load_from_file = load
         if os.path.exists(os.path.join('picklejar','filter.pickle')):
             self.load()
         else:
@@ -47,7 +48,7 @@ class Filter():
         with open(os.path.join('picklejar','filter.pickle'), 'rb') as f:
             tmp_dic = dill.load(f)
 
-            if tmp_dic['target_words']==self.target_words and tmp_dic['general_words'] == self.general_words and tmp_dic['min_count']==self.min_count:
+            if (tmp_dic['target_words']==self.target_words and tmp_dic['general_words'] == self.general_words and tmp_dic['min_count']==self.min_count) or self.load_from_file:
                 self.__dict__.clear()
                 self.__dict__.update(tmp_dic)
             else:

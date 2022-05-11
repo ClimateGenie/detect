@@ -12,11 +12,12 @@ import pickle
 
 class Embedding():
 
-    def __init__(self,training_data,dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
+    def __init__(self,training_data = None,load = False, dm=0,vect_size=200,window = 5, hs = 1, epochs = 3):
 
+        self.load_from_file = load
         self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
         self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
-        self.training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in enumerate(training_data)]
+        self.training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in training_data.iteritems()]
         [self.vect_size, self.dm, self.window, self.hs, self.epochs] = [vect_size, dm, window, hs, epochs] 
         try:
             self.load()
@@ -31,7 +32,8 @@ class Embedding():
         self.save()
 
     def vectorise(self,sentence):
-        return  self.model.infer_vector(word_token(sentence))
+        vect =   self.model.infer_vector(word_token(sentence))
+        return(vect)
 
     def find_closest(self,sentence, num = 1, print_out = False):
         inferred_vector = self.vectorise(sentence)
@@ -66,7 +68,7 @@ class Embedding():
         print('Unpickling')
         with open(self.pickle_path, 'rb') as f:
             tmp_dic = dill.load(f)
-            if tmp_dic['training_data'] == self.training_data:
+            if tmp_dic['training_data'] == self.training_data or self.load_from_file:
                 self.__dict__.clear()
                 self.__dict__.update(tmp_dic)
             else:

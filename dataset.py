@@ -1,4 +1,8 @@
 from time import sleep
+from sklearn.preprocessing import LabelEncoder
+from io import BytesIO
+from zipfile import ZipFile
+from urllib.request import urlopen
 from scipy.stats.distributions import entropy
 import dill
 from pandas.core.algorithms import isin
@@ -15,10 +19,11 @@ import pandas as pd
 from datetime import datetime, time, timedelta, date
 import pytz
 import warnings
+import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks=2)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 4)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -42,6 +47,7 @@ class Dataset():
                 
 
         if len(new_timestamps):
+            self.reload = True
             print('Fetching for ' + ', '.join([datetime.fromtimestamp(x).strftime('%Y-%m-%d') for x in new_timestamps]))
 
             climate_urls = [self.get_links(date,'climate') for date in tqdm(new_timestamps,total=len(new_timestamps))]
@@ -83,6 +89,8 @@ class Dataset():
             
 
             self.save()
+        else:
+            self.reload = False
 
 
         
@@ -109,6 +117,13 @@ class Dataset():
                 return None
 
 
+
+    def save_filtered(self):
+        self.df_filtered.to_pickle('./picklejar/df_filtered')
+
+    def load_filtered(self):
+        self.df_filtered = pd.read_pickle('./picklejar/df_filtered')
+
     def save(self):
         print('Pickling')
         with open(os.path.join('picklejar','dataset.pickle'), 'wb') as f:
@@ -123,8 +138,8 @@ class Dataset():
             self.__dict__.update(tmp_dic)
 
     def vectorise(self, embedding_scheme):
-        self.df_filtered['vector'] = simple_map(embedding_scheme.vectorise, self.df_filtered['sentence'])
-        return self.df_filtered
+        self.df_filtered['vector'] = embedding_scheme.model.dv[self.df_filtered.index].tolist()
+
 
     
     def climate_words(self):
@@ -136,6 +151,7 @@ class Dataset():
 
 
     def filter_for_climate(self, filter, threshold = 0.9):
+        self.threshold = threshold
         df = self.df_sentence.copy()
         df['prob'] = simple_map(filter.prob, df['sentence'])
         self.df_filtered = df[df['prob']>threshold]
@@ -144,39 +160,47 @@ class Dataset():
     def apply_labels(self):
         if os.path.exists('labels.csv'):
             self.df_labels = pd.read_csv('labels.csv', index_col=0)
-            self.df_labels = pd.DataFrame(columns=['class'])
-            self.df_filtered['predicted'] =  pd.Series([[0]] * len(self.df_filtered))
+            self.df_labels.index = [uuid_mod.UUID(x) for x in self.df_labels.index]
+        else:
+            self.df_labels = pd.DataFrame(columns=['sub_sub_claim'])
+            self.df_filtered['predicted'] =  [[0,0]] * len(self.df_filtered)
             self.get_labels()
-        self.df_filtered['class'] = -1
-        self.df_filtered = self.df_filtered.join(self.df_labels, how = 'outter')
+            self.apply_labels()
+        self.df_filtered[self.df_filtered['sub_sub_claim'].isna()]['sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', lsuffix='_left', rsuffix='_right')['sub_sub_claim_right']
+        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(), 'sub_sub_claim'] = -1
+
+    def add_seed_data(self, embedding_scheme, filter):
+        resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
+        df = pd.read_json(BytesIO(resp.read()), compression='zip')
+        df['sentence'] = simple_map(sent_token,df['Paragraph_Text'])
+        df = df.explode('sentence')
+        df['prob'] = simple_map(filter.prob, df['sentence'])
+        df= df[df['prob']>self.threshold]
+        df['vector'] = simple_map(embedding_scheme.vectorise, df['sentence'])
+        df['parent'] = None
+        df.index = simple_map(uuid, [str(x) for x in df.index])
+        self.df_filtered = pd.concat([self.df_filtered, df[['parent', 'sentence', 'prob', 'vector','sub_sub_claim']]])
+
+
+    def encode_labels(self):
+        self.encoder = LabelEncoder()
+        self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'class'] = self.encoder.fit_transform(self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'sub_sub_claim'])        
+        self.df_filtered.loc[self.df_filtered['class'].isna(), 'class']  = -1        
 
     def predict_unlabeled(self, model):
         labels = model.model.label_distributions_
-        vectors = model.model.X_
-        df_vect_pred = pd.DataFrame([vectors,labels], columns=['vector', 'predicted'])
-        self.df_filtered = self.df_filtered.merge(df_vect_pred) 
+        self.df_filtered['predicted'] = [*labels]
 
     def get_labels(self, n=10):
-        self.df_filtered['entropy'] = entropy(self.df_filtered['predicted'])
-        to_label = self.df_filtered[self.df_filtered.index.isin(self.df_skeptics.index)].sort(['entropy']).iloc[:n]
-        for index, row in to_label.itterows:
-            label = input(row['sentence'].values + '\n')
+        self.df_filtered['entropy'] = self.df_filtered['predicted'].apply(lambda x: entropy(x))
+        to_label = self.df_filtered[self.df_filtered['class'] != -1].sort_values(['entropy']).iloc[:n]
+        print(to_label)
+        for index, row in to_label.iterrows():
+            label = input(row['sentence'] + '\n')
             self.df_labels.loc[index] = [label]
         self.df_labels.to_csv('labels.csv')
         
 
-
-
-
-
-
-
-        
-
-
-
-        
-        
 
 if __name__ == '__main__':
     d = Dataset()
