@@ -30,9 +30,9 @@ def simple_starmap(func, ls):
     pool.join()
     return out
 
-def simple_map(func, ls):
+def simple_map(func, ls, desc = None):
     pool = Pool()
-    out = [x for x in tqdm(pool.imap(func,ls), total= len(ls))]
+    out = [x for x in tqdm(pool.imap(func,ls), total= len(ls),desc=desc)]
     pool.close()
     pool.join()
     return out

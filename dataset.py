@@ -1,4 +1,5 @@
 from time import sleep
+from pandas.core.indexes.api import default_index
 from sklearn.preprocessing import LabelEncoder
 from io import BytesIO
 from zipfile import ZipFile
@@ -23,7 +24,7 @@ import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 4)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 52)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -50,7 +51,7 @@ class Dataset():
             self.reload = True
             print('Fetching for ' + ', '.join([datetime.fromtimestamp(x).strftime('%Y-%m-%d') for x in new_timestamps]))
 
-            climate_urls = [self.get_links(date,'climate') for date in tqdm(new_timestamps,total=len(new_timestamps))]
+            climate_urls = flatten([ [self.get_links(date,'climate') for date in tqdm(new_timestamps,total=len(new_timestamps))],  [self.get_links(date,'environment') for date in tqdm(new_timestamps,total=len(new_timestamps))]   ])
             news_urls = flatten([ [self.get_links(date,'news') for date in tqdm(new_timestamps,total=len(new_timestamps))],  [self.get_links(date,'worldnews') for date in tqdm(new_timestamps,total=len(new_timestamps))]   ])
             climateskeptics_urls =  [self.get_links(date,'climateskeptics') for date in tqdm(new_timestamps,total=len(new_timestamps))]
 
@@ -59,9 +60,9 @@ class Dataset():
             df_skeptics = pd.DataFrame(flatten(climateskeptics_urls),columns= ['author','timestamp','post_url','media_url','score','comments','uuid'])
 
 
-            df_climate['article'] = simple_map(self.get_articles, df_climate['media_url'])
-            df_news['article'] = simple_map(self.get_articles, df_news['media_url'])
-            df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'])
+            df_climate['article'] = simple_map(self.get_articles, df_climate['media_url'], 'Fetching Climate Articles')
+            df_news['article'] = simple_map(self.get_articles, df_news['media_url'], 'Fetching News Articles')
+            df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'], 'Fetching Skeptics Articles')
 
 
             df_climate['uuid'] = simple_map(uuid, df_climate['post_url'])
@@ -86,16 +87,23 @@ class Dataset():
             df_sentence.set_index(['uuid'], inplace=True)
             self.df_sentence = pd.concat([self.df_sentence,df_sentence[['parent','sentence']]])
 
-            
+
+
+            resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
+            df = pd.read_json(BytesIO(resp.read()), compression='zip')
+            df.index = df['ParagraphId'].apply(lambda x: UUID(int=x))
+            self.df_seed = df
 
             self.save()
+
+
         else:
             self.reload = False
 
 
         
     def get_links(self,date_int, subreddit):
-        url = 'https://api.pushshift.io/reddit/search/submission/?subreddit='+ subreddit +'&sort=asc&sort_type=num_comments&after=' + str(int(date_int)) + '&before='+str(int(date_int + 86400)) +'&size=50'
+        url = 'https://api.pushshift.io/reddit/search/submission/?subreddit='+ subreddit +'&sort=asc&sort_type=num_comments&after=' + str(int(date_int)) + '&before='+str(int(date_int + 86400)) +'&size=5'
         res = None
         while res != 200:
             r = requests.get(url)
@@ -113,25 +121,26 @@ class Dataset():
                 a.download()
                 a.parse()
                 return a.text
-            except newspaper.article.ArticleException:
+            except:
                 return None
 
 
 
     def save_filtered(self):
+        print('Pickling df_filtered')
         self.df_filtered.to_pickle('./picklejar/df_filtered')
 
     def load_filtered(self):
         self.df_filtered = pd.read_pickle('./picklejar/df_filtered')
 
     def save(self):
-        print('Pickling')
+        print('Pickling Dataset')
         with open(os.path.join('picklejar','dataset.pickle'), 'wb') as f:
             dill.dump(self.__dict__,f,2)
 
 
     def load(self):
-        print('Unpickling')
+        print('Unpickling Dataset')
         with open(os.path.join('picklejar','dataset.pickle'), 'rb') as f:
             tmp_dic = dill.load(f)
             self.__dict__.clear()
@@ -143,7 +152,7 @@ class Dataset():
 
     
     def climate_words(self):
-        return flatten(flatten([simple_map(word_token,self.df_climate['article']), simple_map(word_token, self.df_skeptics['article'])]))
+        return flatten(flatten([simple_map(word_token,self.df_climate['article'],'Tokenising Climate Sentences'), simple_map(word_token, self.df_skeptics['article'], 'Tokenising Skeptics Sentences'),  simple_map(word_token, self.df_seed['Paragraph_Text'], 'Tokenising Seed Sentences')]))
 
 
     def news_words(self):
@@ -153,8 +162,24 @@ class Dataset():
     def filter_for_climate(self, filter, threshold = 0.9):
         self.threshold = threshold
         df = self.df_sentence.copy()
-        df['prob'] = simple_map(filter.prob, df['sentence'])
-        self.df_filtered = df[df['prob']>threshold]
+        
+        df['word'] = df['sentence'].apply(lambda x: word_token(x))
+        df = df.explode('word')
+
+        df[['p', '!p']] = None,None
+        for word, val in tqdm(filter.norm.iteritems(), total= len(filter.norm), desc ='Filtering Sentences' ):
+            df.loc[df['word'] == word,'p'] = val
+            df.loc[df['word'] == word,'!p'] = 1-val
+
+        df.dropna(inplace= True)
+        
+        df_pr = df.groupby(by=lambda x: x).prod()
+
+        print(df_pr)
+
+        df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
+
+        self.df_filtered = df_pr.join(self.df_sentence, lsuffix = 'l').loc[df_pr['prob']>threshold,['parent', 'sentence', 'prob']]
         return self.df_filtered
 
     def apply_labels(self):
@@ -166,20 +191,20 @@ class Dataset():
             self.df_filtered['predicted'] =  [[0,0]] * len(self.df_filtered)
             self.get_labels()
             self.apply_labels()
-        self.df_filtered[self.df_filtered['sub_sub_claim'].isna()]['sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', lsuffix='_left', rsuffix='_right')['sub_sub_claim_right']
+        self.df_filtered['sub_sub_claim'] = None
+        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(),'sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
+        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(),'sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
         self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(), 'sub_sub_claim'] = -1
 
-    def add_seed_data(self, embedding_scheme, filter):
-        resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
-        df = pd.read_json(BytesIO(resp.read()), compression='zip')
-        df['sentence'] = simple_map(sent_token,df['Paragraph_Text'])
-        df = df.explode('sentence')
-        df['prob'] = simple_map(filter.prob, df['sentence'])
-        df= df[df['prob']>self.threshold]
-        df['vector'] = simple_map(embedding_scheme.vectorise, df['sentence'])
-        df['parent'] = None
-        df.index = simple_map(uuid, [str(x) for x in df.index])
-        self.df_filtered = pd.concat([self.df_filtered, df[['parent', 'sentence', 'prob', 'vector','sub_sub_claim']]])
+    def add_seed_data(self):
+        df = self.df_seed.copy()
+        df['sentence'] = simple_map(sent_token,df['Paragraph_Text'], 'Tokenising Seed Data') 
+        df['new_ind'] = df['sentence'].apply(lambda x: [i for i in range(len(x))])
+        df['parent'] = df['ParagraphId'].apply(lambda x: UUID(int=x))
+        df= df.explode(['sentence','new_ind'])
+        df['uuid'] = df.apply(lambda x: uuid(x[['new_ind','parent']]), axis =1)
+        df.set_index(['uuid'], inplace=True)
+        self.df_sentence = pd.concat([self.df_sentence, df[['parent', 'sentence']]])
 
 
     def encode_labels(self):
@@ -194,7 +219,6 @@ class Dataset():
     def get_labels(self, n=10):
         self.df_filtered['entropy'] = self.df_filtered['predicted'].apply(lambda x: entropy(x))
         to_label = self.df_filtered[self.df_filtered['class'] != -1].sort_values(['entropy']).iloc[:n]
-        print(to_label)
         for index, row in to_label.iterrows():
             label = input(row['sentence'] + '\n')
             self.df_labels.loc[index] = [label]
@@ -204,3 +228,4 @@ class Dataset():
 
 if __name__ == '__main__':
     d = Dataset()
+

@@ -17,12 +17,15 @@ class Embedding():
         self.load_from_file = load
         self.model_string = f'embedding-{dm}-{vect_size}-{window}-{hs}-{epochs}.pickle'
         self.pickle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'picklejar',self.model_string)
-        self.training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in training_data.iteritems()]
-        [self.vect_size, self.dm, self.window, self.hs, self.epochs] = [vect_size, dm, window, hs, epochs] 
-        try:
+        if load:
             self.load()
-        except FileNotFoundError:
-            self.build_model()
+        else:
+            self.training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in training_data.iteritems()]
+            [self.vect_size, self.dm, self.window, self.hs, self.epochs] = [vect_size, dm, window, hs, epochs] 
+            try:
+                self.load()
+            except FileNotFoundError:
+                self.build_model()
     
 
     def build_model(self):
@@ -59,26 +62,23 @@ class Embedding():
 
     
     def save(self):
-        print('Pickling')
+        print('Pickling Embedding Scheme')
         with open(self.pickle_path, 'wb') as f:
             dill.dump(self.__dict__,f,2)
 
 
     def load(self):
-        print('Unpickling')
+        print('Unpickling Embedding Scheme')
         with open(self.pickle_path, 'rb') as f:
             tmp_dic = dill.load(f)
-            if tmp_dic['training_data'] == self.training_data or self.load_from_file:
+            print(tmp_dic.keys())
+            if self.load_from_file:
+                self.__dict__.clear()
+                self.__dict__.update(tmp_dic)
+            elif tmp_dic['training_data'] == self.training_data :
                 self.__dict__.clear()
                 self.__dict__.update(tmp_dic)
             else:
                 self.build_model()
 
 
-
-if __name__ == "__main__":
-    d = Dataset()
-    training_data = flatten(flatten([simple_map(sent_token,d.df_climate['article']), simple_map(sent_token, d.df_skeptics['article'])]))
-    e = Embedding(training_data)
-    e.eye_test()
-    d.vectorise(e)

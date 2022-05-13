@@ -4,11 +4,13 @@ from dataset import Dataset
 from utils import *
 from collections import Counter
 import dill
+import pandas as pd
 
 class Filter():
-    def __init__(self,target_words= None,general_words = None,load = False, min_count = 100):
+    def __init__(self,target_words= None,general_words = None,load = False, min_count = 10, alpha = 1):
 
         self.target_words = target_words
+        self.alpha = alpha
         self.general_words = general_words
         self.min_count = min_count
         self.load_from_file = load
@@ -23,18 +25,22 @@ class Filter():
         target_count = dict(Counter(self.target_words))
         general_count = dict(Counter(self.general_words))
 
+        total_count = {k: general_count.get(k, 0) + target_count.get(k, 0) for k in set(target_count) | set(general_count)}
 
-        self.normed_target = {k: v for k, v in target_count.items() if v > self.min_count}
-        self.normed_general = {k: v for k, v in general_count.items() if v > self.min_count}
+        word_dict = set([k for k,v in total_count.items() if v > self.min_count])
+        self.normed_target = {k: target_count[k] if k in target_count.keys() else 0 for k in word_dict}
+        self.normed_general = {k: general_count[k] if k in general_count.keys() else 0 for k in word_dict}
 
-        self.word_dict = set(self.normed_target.keys()).intersection(set(self.normed_general.keys()))
-        self.ratio = {k: self.normed_target[k]*sum(self.normed_general.values())/self.normed_general[k]/sum(self.normed_target.values())  for k in self.word_dict }
-        self.norm = {k: v/(v+1)  for k,v in self.ratio.items()}
+        self.ratio = {k: (self.normed_target[k] +self.alpha)*sum(self.normed_general.values())/(self.normed_general[k] + 2*self.alpha)/sum(self.normed_target.values())  for k in word_dict }
+        self.norm = pd.Series({k: v/(v+1)  for k,v in self.ratio.items()})
 
     def prob(self, sentence):
-        words = [x for x in word_token(sentence) if x in self.word_dict]
-        probs = {x: self.norm[x] for x in words}
-        return product(list(probs.values()))/(product(list(probs.values())) + product([1-x for x in probs.values()]))
+        words = [x for x in word_token(sentence) if x in self.norm.index]
+        if len(words):
+            probs = self.norm[words]
+            return product(probs)/(product(probs) + product([1-x for x in probs]))
+        else:
+            return 0.5
 
 
     def save(self):
@@ -56,11 +62,5 @@ class Filter():
                 self.save()
 
         
-
-if __name__ == "__main__":
-    d = Dataset()
-    climate_words = flatten(flatten([simple_map(word_token,d.df_climate['article']), simple_map(word_token, d.df_skeptics['article'])]))
-    news_words = flatten(simple_map(word_token,d.df_news['article']))
-    f = Filter(climate_words,news_words)
 
 
