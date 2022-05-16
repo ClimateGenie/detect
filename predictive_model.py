@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 
-class Model():
+class Predictive_model():
     def __init__(self,data):
 
         labeled, unlabeled = [x for _,x in data.groupby(data['class'] == -1)]
