@@ -152,11 +152,10 @@ class Dataset():
 
     
     def climate_words(self):
-        return flatten(flatten([simple_map(word_token,self.df_climate['article'],'Tokenising Climate Sentences'), simple_map(word_token, self.df_skeptics['article'], 'Tokenising Skeptics Sentences'),  simple_map(word_token, self.df_seed['Paragraph_Text'], 'Tokenising Seed Sentences')]))
-
+        return pd.concat([self.df_climate['article'],self.df_skeptics['article'],  self.df_seed['Paragraph_Text']])
 
     def news_words(self):
-        return flatten(simple_map(word_token,self.df_news['article']))
+        return self.df_news['article')
 
 
     def filter_for_climate(self, filter, threshold = 0.9):

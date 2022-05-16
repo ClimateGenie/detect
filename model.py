@@ -16,10 +16,12 @@ class Model():
     def build_model(self):
         d = Dataset()    
         d.add_seed_data()
+
         climate_words = d.climate_words()
         news_words = d.news_words()
         f = Filter(climate_words,news_words, min_count=100)
-        d.filter_for_climate(f, threshold=0.8)
+
+
         training_data = d.df_filtered['sentence'].apply(word_token)
         e = Embedding(training_data)
         d.vectorise(e)

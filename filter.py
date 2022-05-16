@@ -12,6 +12,8 @@ class Filter():
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
         self.threshold = kwargs.get('threshold', 0.9)
+        target_words =flatten(simple_map(word_token,target_words))
+        general_words =flatten(simple_map(word_token, general_words))
         self.word_count = sum([len(target_words), len(general_words)])
 
         self.pickle_string = '-'.join([f'{key}:{str(x)}' for key, x in self.__dict__.items()])
