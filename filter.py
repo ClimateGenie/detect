@@ -44,13 +44,13 @@ class Filter():
 
 
     def save(self):
-        print('Pickling')
+        print('Pickling Filter')
         with open(os.path.join('picklejar','filter.pickle'), 'wb') as f:
             dill.dump(self.__dict__,f,2)
 
 
     def load(self):
-        print('Unpickling')
+        print('Unpickling Filter')
         with open(os.path.join('picklejar','filter.pickle'), 'rb') as f:
             tmp_dic = dill.load(f)
 

@@ -24,7 +24,7 @@ import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 52)):
+    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 60)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -166,11 +166,11 @@ class Dataset():
         df['word'] = df['sentence'].apply(lambda x: word_token(x))
         df = df.explode('word')
 
+
         df[['p', '!p']] = None,None
         for word, val in tqdm(filter.norm.iteritems(), total= len(filter.norm), desc ='Filtering Sentences' ):
             df.loc[df['word'] == word,'p'] = val
             df.loc[df['word'] == word,'!p'] = 1-val
-
         df.dropna(inplace= True)
         
         df_pr = df.groupby(by=lambda x: x).prod()
@@ -187,7 +187,7 @@ class Dataset():
             self.df_labels = pd.read_csv('labels.csv', index_col=0)
             self.df_labels.index = [uuid_mod.UUID(x) for x in self.df_labels.index]
         else:
-            self.df_labels = pd.DataFrame(columns=['sub_sub_claim'])
+            self.df_labels = pd.DataFrame(columns=['sub_sub_claim', 'timestamp'])
             self.df_filtered['predicted'] =  [[0,0]] * len(self.df_filtered)
             self.get_labels()
             self.apply_labels()
@@ -212,17 +212,30 @@ class Dataset():
         self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'class'] = self.encoder.fit_transform(self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'sub_sub_claim'])        
         self.df_filtered.loc[self.df_filtered['class'].isna(), 'class']  = -1        
 
+
+    
     def predict_unlabeled(self, model):
-        labels = model.model.label_distributions_
-        self.df_filtered['predicted'] = [*labels]
+        labels = pd.Series([ x for x in model.model.label_distributions_])
+        labels.index = model.X_train.index
+        predicted = pd.Series(model.model.transduction_).apply(lambda x: int(x))
+        predicted.index = model.X_train.index
+        predicted = pd.concat([predicted, model.Y_test])
+
+
+
+        self.df_filtered= self.df_filtered.join(labels.rename('distributions'), how = 'left')
+        self.df_filtered = self.df_filtered.join(predicted.rename('predicted'), how = 'left')
+        self.df_filtered['predicted'] = self.encoder.inverse_transform(self.df_filtered['predicted'])
+         
 
     def get_labels(self, n=10):
-        self.df_filtered['entropy'] = self.df_filtered['predicted'].apply(lambda x: entropy(x))
-        to_label = self.df_filtered[self.df_filtered['class'] != -1].sort_values(['entropy']).iloc[:n]
+        self.df_filtered['entropy'] = self.df_filtered['distributions'].apply(lambda x: entropy(x))
+        to_label = self.df_filtered[self.df_filtered['class'] == -1].sort_values(['entropy'], ascending = False).iloc[:n]
         for index, row in to_label.iterrows():
-            label = input(row['sentence'] + '\n')
-            self.df_labels.loc[index] = [label]
-        self.df_labels.to_csv('labels.csv')
+
+            label = input(str(index) +': '+ str(row['predicted']) + ' @ ' +str(row['entropy'])+ '\n'+ row['sentence'] + '\n')
+            self.df_labels.loc[index] = [label, datetime.now()]
+            self.df_labels.to_csv('labels.csv')
         
 
 

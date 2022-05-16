@@ -22,7 +22,6 @@ if d.reload:
     d.save_filtered()
 else:
     d.load_filtered()
-    d.add_seed_data()
     e = Embedding(load = True)
     f = Filter(load=True)
 
@@ -31,5 +30,7 @@ while True:
     d.encode_labels()
 
     m = Model(d.df_filtered)
+    m.evaluate()
     d.predict_unlabeled(m)
-    d.get_labels(n=10)
+    d.get_labels(n=100)
+
