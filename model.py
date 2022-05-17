@@ -20,12 +20,14 @@ class Model():
         climate_words = d.climate_words()
         news_words = d.news_words()
         f = Filter(climate_words,news_words, min_count=100)
-
-
+        
         training_data = d.df_filtered['sentence'].apply(word_token)
-        e = Embedding(training_data)
+
+        e = Embedding(training_data, model_type='doc2vecdm'
+
+
         d.vectorise(e)
-        d.save_filtered()
+
         m = Predictive_model(d.df_filtered)
 
         
