@@ -12,14 +12,8 @@ class Filter():
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
         self.threshold = kwargs.get('threshold', 0.9)
-        target_words =flatten(simple_map(word_token,target_words))
-        general_words =flatten(simple_map(word_token, general_words))
-        self.word_count = sum([len(target_words), len(general_words)])
-
-        self.pickle_string = '-'.join([f'{key}:{str(x)}' for key, x in self.__dict__.items()])
-
-        self.target_words = target_words
-        self.general_words = general_words
+        self.target_words =flatten(simple_map(word_token,target_words))
+        self.general_words =flatten(simple_map(word_token, general_words))
 
 
     def train(self):
@@ -35,7 +29,29 @@ class Filter():
         self.ratio = {k: (self.normed_target[k] +self.alpha)*sum(self.normed_general.values())/(self.normed_general[k] + 2*self.alpha)/sum(self.normed_target.values())  for k in word_dict }
         self.norm = pd.Series({k: v/(v+1)  for k,v in self.ratio.items()})
 
-    def predict(self, sentence):
+    def predict(self, df):
+        df_store = df.copy()
+        df['word'] = df['sentence'].apply(lambda x: word_token(x))
+        df = df.explode('word')
+
+
+        df[['p', '!p']] = None,None
+        for word, val in tqdm(self.norm.iteritems(), total= len(self.norm), desc ='Filtering Sentences' ):
+            df.loc[df['word'] == word,'p'] = val
+            df.loc[df['word'] == word,'!p'] = 1-val
+        df.dropna(inplace= True)
+        
+        
+        df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
+
+
+
+        df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
+        df_pr['climate'] = df_pr['prob'].apply(lambda x: x >= self.threshold)
+        return df_store.join(df_pr)['climate']
+
+
+    def predict_single(self, sentence):
         words = [x for x in word_token(sentence) if x in self.norm.index]
         if len(words):
             probs = self.norm[words]
@@ -44,20 +60,5 @@ class Filter():
             pr =  0.5
         threshold_bool = pr > self.threshold
         return threshold_bool
-
-
-    def save(self):
-        print('Pickling Filter')
-        with open(os.path.join('picklejar','filter',self.pickle_string), 'wb') as f:
-            dill.dump(self.__dict__,f,2)
-
-
-    def load(self):
-        print('Unpickling Filter')
-        with open(os.path.join('picklejar','filter',self.pickle_string), 'rb') as f:
-            tmp_dic = dill.load(f)
-            self.__dict__.update(tmp_dic)
-
-        
 
 

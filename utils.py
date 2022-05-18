@@ -12,7 +12,7 @@ from uuid  import UUID
 def sent_token(doc):
     if not isinstance(doc,str):
         doc = ""
-    return nltk.tokenize.sent_tokenize(doc)
+    return flatten([ x.splitlines() for x in nltk.tokenize.sent_tokenize(doc)])
 
 def word_token(sentence):
     if not isinstance(sentence,str):

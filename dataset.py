@@ -35,6 +35,20 @@ class Dataset():
             self.df_skeptics = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
             self.df_sentence = pd.DataFrame(columns=['parent', 'sentence'])
 
+            resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
+            df = pd.read_json(BytesIO(resp.read()), compression='zip')
+            df.index = df['ParagraphId'].apply(lambda x: UUID(int=x))
+            self.df_seed = df
+
+            df['sentence'] = simple_map(sent_token,df['Paragraph_Text'], 'Tokenising Seed Data') 
+            df['new_ind'] = df['sentence'].apply(lambda x: [i for i in range(len(x))])
+            df['parent'] = df['ParagraphId'].apply(lambda x: UUID(int=x))
+            df= df.explode(['sentence','new_ind'])
+            df['uuid'] = df.apply(lambda x: uuid(x[['new_ind','parent']]), axis =1)
+            df.set_index(['uuid'], inplace=True)
+
+            self.df_sentence = pd.concat([self.df_sentence, df[['parent', 'sentence']]])
+
         utc = pytz.UTC
         day = utc.localize(from_date)
         new_timestamps = []
@@ -88,12 +102,6 @@ class Dataset():
             self.df_sentence = pd.concat([self.df_sentence,df_sentence[['parent','sentence']]])
 
 
-
-            resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
-            df = pd.read_json(BytesIO(resp.read()), compression='zip')
-            df.index = df['ParagraphId'].apply(lambda x: UUID(int=x))
-            self.df_seed = df
-
             self.save()
 
 
@@ -125,14 +133,6 @@ class Dataset():
                 return None
 
 
-
-    def save_filtered(self):
-        print('Pickling df_filtered')
-        self.df_filtered.to_pickle('./picklejar/df_filtered')
-
-    def load_filtered(self):
-        self.df_filtered = pd.read_pickle('./picklejar/df_filtered')
-
     def save(self):
         print('Pickling Dataset')
         with open(os.path.join('picklejar','dataset.pickle'), 'wb') as f:
@@ -146,90 +146,39 @@ class Dataset():
             self.__dict__.clear()
             self.__dict__.update(tmp_dic)
 
-    def vectorise(self, embedding_scheme):
-        self.df_filtered['vector'] = embedding_scheme.model.dv[self.df_filtered.index].tolist()
-
-
     
     def climate_words(self):
         return pd.concat([self.df_climate['article'],self.df_skeptics['article'],  self.df_seed['Paragraph_Text']])
 
     def news_words(self):
-        return self.df_news['article')
+        return self.df_news['article']
 
 
-    def filter_for_climate(self, filter, threshold = 0.9):
-        self.threshold = threshold
-        df = self.df_sentence.copy()
-        
-        df['word'] = df['sentence'].apply(lambda x: word_token(x))
-        df = df.explode('word')
-
-
-        df[['p', '!p']] = None,None
-        for word, val in tqdm(filter.norm.iteritems(), total= len(filter.norm), desc ='Filtering Sentences' ):
-            df.loc[df['word'] == word,'p'] = val
-            df.loc[df['word'] == word,'!p'] = 1-val
-        df.dropna(inplace= True)
-        
-        df_pr = df.groupby(by=lambda x: x).prod()
-
-        print(df_pr)
-
-        df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
-
-        self.df_filtered = df_pr.join(self.df_sentence, lsuffix = 'l').loc[df_pr['prob']>threshold,['parent', 'sentence', 'prob']]
-        return self.df_filtered
-
-    def apply_labels(self):
+    def apply_labels(self, df):
         if os.path.exists('labels.csv'):
             self.df_labels = pd.read_csv('labels.csv', index_col=0)
+            print(self.df_labels)
             self.df_labels.index = [uuid_mod.UUID(x) for x in self.df_labels.index]
+            self.df_labels =  self.df_labels[~self.df_labels.index.duplicated()]
+            print(self.df_labels)
         else:
             self.df_labels = pd.DataFrame(columns=['sub_sub_claim', 'timestamp'])
-            self.df_filtered['predicted'] =  [[0,0]] * len(self.df_filtered)
-            self.get_labels()
-            self.apply_labels()
-        self.df_filtered['sub_sub_claim'] = None
-        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(),'sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
-        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(),'sub_sub_claim'] = self.df_filtered[self.df_filtered['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
-        self.df_filtered.loc[self.df_filtered['sub_sub_claim'].isna(), 'sub_sub_claim'] = -1
-
-    def add_seed_data(self):
-        df = self.df_seed.copy()
-        df['sentence'] = simple_map(sent_token,df['Paragraph_Text'], 'Tokenising Seed Data') 
-        df['new_ind'] = df['sentence'].apply(lambda x: [i for i in range(len(x))])
-        df['parent'] = df['ParagraphId'].apply(lambda x: UUID(int=x))
-        df= df.explode(['sentence','new_ind'])
-        df['uuid'] = df.apply(lambda x: uuid(x[['new_ind','parent']]), axis =1)
-        df.set_index(['uuid'], inplace=True)
-        self.df_sentence = pd.concat([self.df_sentence, df[['parent', 'sentence']]])
+        df['sub_sub_claim'] = None
+        print(df[df['sub_sub_claim'].isna()].index.duplicated())
+        df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
+        df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
+        df.loc[df['sub_sub_claim'].isna(), 'sub_sub_claim'] = -1
+        return df
 
 
-    def encode_labels(self):
+    def encode_labels(self, df):
         self.encoder = LabelEncoder()
-        self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'class'] = self.encoder.fit_transform(self.df_filtered.loc[self.df_filtered['sub_sub_claim'] != -1, 'sub_sub_claim'])        
-        self.df_filtered.loc[self.df_filtered['class'].isna(), 'class']  = -1        
+        df.loc[df['sub_sub_claim'] != -1, 'class'] = self.encoder.fit_transform(df.loc[df['sub_sub_claim'] != -1, 'sub_sub_claim'])        
+        df.loc[df['class'].isna(), 'class']  = -1        
+        return df
 
-
-    
-    def predict_unlabeled(self, model):
-        labels = pd.Series([ x for x in model.model.label_distributions_])
-        labels.index = model.X_train.index
-        predicted = pd.Series(model.model.transduction_).apply(lambda x: int(x))
-        predicted.index = model.X_train.index
-        predicted = pd.concat([predicted, model.Y_test])
-
-
-
-        self.df_filtered= self.df_filtered.join(labels.rename('distributions'), how = 'left')
-        self.df_filtered = self.df_filtered.join(predicted.rename('predicted'), how = 'left')
-        self.df_filtered['predicted'] = self.encoder.inverse_transform(self.df_filtered['predicted'])
-         
-
-    def get_labels(self, n=10):
-        self.df_filtered['entropy'] = self.df_filtered['distributions'].apply(lambda x: entropy(x))
-        to_label = self.df_filtered[self.df_filtered['class'] == -1].sort_values(['entropy'], ascending = False).iloc[:n]
+    def get_labels(self, df, n=10):
+        to_label = df[df['class'] == -1].sort_values(['entropy'], ascending = False).iloc[:n]
         for index, row in to_label.iterrows():
 
             label = input(str(index) +': '+ str(row['predicted']) + ' @ ' +str(row['entropy'])+ '\n'+ row['sentence'] + '\n')

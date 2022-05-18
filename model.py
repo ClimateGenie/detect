@@ -2,34 +2,111 @@ from dataset import Dataset
 from embedding import Embedding
 from filter import Filter
 from predictive_model import Predictive_model
+import pandas as pd
 from utils import *
 
 
 class Model():
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, kwargs = {
+        'filter':{
+            'min_count': 5000
+            },
+        'embedding': {
+            'model_type':'doc2vecdm',
+            'args': {}
+            },
+        'predictive_model': {
+            'model_type':'random_forrest',
+            'args': {}
+            }
+        }) -> None:
+        """
 
-    def load()
-        
+        kwargs are used to define parameters for each individual model
 
-    def build_model(self):
+        kwargs = {
+
+        'filter': {
+            
+            'alpha':
+            'min_count':
+            'threshold':
+
+        },
+
+        'embedding': {
+            'model_type' =['doc2vecdbow','doc2vecdm','tfidf','bow', 'word2vecsum', 'word2vecmean' ]
+            'args' = {}
+        },
+
+        'predictive_model': {
+            'model_type': ['semi_supervised', 'n_neighbors','rbf_svm','gaussian_process','decision_tree','random_forrest','nn','adaboost','qda'] 
+            'args' = {}
+        }
+
+        }
+
+        """
+        self.args  = kwargs
+
+
+    def train(self):
         d = Dataset()    
-        d.add_seed_data()
+        print(d.df_sentence[d.df_sentence.index.duplicated()])
+        self.training_data =d.encode_labels(d.apply_labels(d.df_sentence))
 
-        climate_words = d.climate_words()
-        news_words = d.news_words()
-        f = Filter(climate_words,news_words, min_count=100)
+        f = Filter(d.climate_words(),d.news_words(), **self.args['filter'])
+        f.train()
+        self.training_data['climate'] = f.predict(self.training_data)
+
+        e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'], kwargs=self.args['embedding']['args'])
+        e.train()
+        self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
+
+        m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
+        m.train()
+
+
+        self.d, self.f, self.e, self.m = d,f,e,m
+
+    def predict(self,series):
+        df = pd.DataFrame(series, columns=['sentence'])
+        df['climate'] = self.f.predict(df)
+        print(df)
+        df.loc[df['climate'] == True,'vector'] = self.e.predict(df[df['climate'] == True])
+        print(df)
+        df.loc[df['climate'] == True,'class'] = self.m.predict(df[df['climate'] == True])
+        print(df)
+        df.loc[df['class'].isna(),'class'] = 0
+        print(df)
+        df['class'] = df['class'].apply(lambda x: int(x))
+        print(df)
+        df['predicted'] = self.d.encoder.inverse_transform(df['class'])
+        print(df)
+
+
+
+        return df
         
-        training_data = d.df_filtered['sentence'].apply(word_token)
-
-        e = Embedding(training_data, model_type='doc2vecdm'
-
-
-        d.vectorise(e)
-
-        m = Predictive_model(d.df_filtered)
-
         
 
 
+    def save(self):
+        print('Pickling Filter')
+        with open(os.path.join('picklejar','model'), 'wb') as f:
+
+            dill.dump(self.__dict__,f,2)
+
+
+    def load(self):
+        print('Unpickling Filter')
+        with open(os.path.join('picklejar','model'), 'rb') as f:
+            tmp_dic = dill.load(f)
+            self.__dict__.update(tmp_dic)
+
+if __name__ == "__main__":
+    m = Model()
+    m.train()
+    test = pd.Series(['Climate change is cool', 'Ice is not melting in antartica'])
+    m.predict(test)

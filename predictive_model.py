@@ -18,7 +18,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 
 class Predictive_model():
-    def __init__(self,data, model, kwargs):
+    def __init__(self,data, model = 'semi_supervised', kwargs = {}):
 
         self.kwargs = kwargs
         if model == 'semi_supervised':
@@ -41,8 +41,6 @@ class Predictive_model():
             self.model_class = GaussianNB
         elif model == 'qda':
             self.model_class = QuadraticDiscriminantAnalysis
-        elif model == 'lin_svm':
-            self.model_class = SVC
 
 
         labeled, unlabeled = [x for _,x in data.groupby(data['class'] == -1)]
@@ -54,10 +52,7 @@ class Predictive_model():
 
         self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(X, Y)
         
-        print(self.X_train)
-        print(self.Y_train)
-        
-        if model = 'semi_supervised':
+        if model == 'semi_supervised':
             self.X_train = pd.concat([self.X_train, unlabeled['vector'].apply(lambda x: np.array(x))])
             self.Y_train = pd.concat([self.Y_train, unlabeled['class']]).apply(lambda x: int(x))
 
@@ -67,8 +62,8 @@ class Predictive_model():
         self.model = self.model_class(**self.kwargs)
         self.model.fit(np.stack(self.X_train.values), self.Y_train)
 
-    def predict(self, vector):
-        return self.model.predict([vector])[0]
+    def predict(self, df):
+        return self.model.predict(np.stack(df['vector']))
 
     def evaluate(self):
         y_hat = self.model.predict(np.stack(self.X_test))
