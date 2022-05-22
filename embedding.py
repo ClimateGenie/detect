@@ -12,6 +12,7 @@ import numpy as np
 import logging
 import collections
 import pickle
+from scipy.sparse import csr_matrix
 
 
 class Embedding():
@@ -27,7 +28,7 @@ class Embedding():
     
 
     def train(self):
-        print('Traing Embedding Scheme')
+        print('Training Embedding Scheme')
 
         if self.model_type == 'doc2vecdm':
             training_data = [gensim.models.doc2vec.TaggedDocument(word_token(x),[i]) for i,x in self.training_data.iteritems()]
@@ -59,17 +60,21 @@ class Embedding():
 
     def predict(self, df):
         ## First do senteces found in the datase
-        vectors = pd.Series(self.model.dv[self.training_data.index].tolist())
-        vectors.index = self.training_data.index
-        df['vector'] = df.join(vectors.rename('vectors'), how = 'left')['vectors']
-        df['vector'] = df['vector'].astype(object)
+        if self.model in ['doc2vecdbow', 'doc2vecdm']:
+            vectors = pd.Series(self.model.dv[self.training_data.index].tolist())
+            vectors.index = self.training_data.index
+            df['vector'] = df.join(vectors.rename('vectors'), how = 'left')['vectors']
+            df['vector'] = df['vector'].astype(object)
+
+        else:
+            df['vector'] = None
         
 
         for index, row in df[df['vector'].isna()].iterrows():
            vect  = self.predict_single(row['sentence'])
            df.at[index, 'vector'] = vect
 
-        
+        df['vector'] = df['vector'].apply(lambda x: csr_matrix(x))
         return df['vector']
 
 
@@ -77,7 +82,7 @@ class Embedding():
         if self.model_type in  ['doc2vecdbow','doc2vecdm']:
             return self.model.infer_vector(word_token(sentence))
         elif self.model_type  in ['tfidf','bow']:
-            return self.model.transform([sentence])[0].A
+            return self.model.transform([sentence])[0]
         elif self.model_type in ['word2vecsum', 'word2vecmean']:
             vect_list = []
             for word in word_token(sentence):

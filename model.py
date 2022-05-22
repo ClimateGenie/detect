@@ -1,3 +1,4 @@
+from sklearn import semi_supervised
 from dataset import Dataset
 from embedding import Embedding
 from filter import Filter
@@ -13,7 +14,7 @@ class Model():
             'min_count': 5000
             },
         'embedding': {
-            'model_type':'doc2vecdm',
+            'model_type':'tfidf',
             'args': {}
             },
         'predictive_model': {
@@ -55,17 +56,21 @@ class Model():
         d = Dataset()    
         print(d.df_sentence[d.df_sentence.index.duplicated()])
         self.training_data =d.encode_labels(d.apply_labels(d.df_sentence))
+        print(self.training_data)
 
         f = Filter(d.climate_words(),d.news_words(), **self.args['filter'])
         f.train()
         self.training_data['climate'] = f.predict(self.training_data)
+        print(self.training_data)
 
         e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'], kwargs=self.args['embedding']['args'])
         e.train()
         self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
+        print(self.training_data)
 
         m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
         m.train()
+        print(self.training_data)
 
 
         self.d, self.f, self.e, self.m = d,f,e,m
@@ -73,19 +78,11 @@ class Model():
     def predict(self,series):
         df = pd.DataFrame(series, columns=['sentence'])
         df['climate'] = self.f.predict(df)
-        print(df)
         df.loc[df['climate'] == True,'vector'] = self.e.predict(df[df['climate'] == True])
-        print(df)
         df.loc[df['climate'] == True,'class'] = self.m.predict(df[df['climate'] == True])
-        print(df)
         df.loc[df['class'].isna(),'class'] = 0
-        print(df)
         df['class'] = df['class'].apply(lambda x: int(x))
-        print(df)
         df['predicted'] = self.d.encoder.inverse_transform(df['class'])
-        print(df)
-
-
 
         return df
         
@@ -109,4 +106,4 @@ if __name__ == "__main__":
     m = Model()
     m.train()
     test = pd.Series(['Climate change is cool', 'Ice is not melting in antartica'])
-    m.predict(test)
+    a = m.predict(test)

@@ -1,40 +1,20 @@
 from model import Model
 from scipy.stats.distributions import entropy as get_entropy
 from predictive_model import Predictive_model
+from scipy.sparse import vstack
 import pandas as pd
 
-model = Model(kwargs={
-        'filter':{
-            'min_count': 5000
-            },
-        'embedding': {
-            'model_type':'doc2vecdm',
-            'args': {}
-            },
-        'predictive_model': {
-            'model_type':'semi_supervised',
-            'args': {'kernel': 'knn'}
-            }
-    })
+model = Model()
 
 model.train()
 
 while True:
-    entropy = pd.Series([ x for x in model.m.model.label_distributions_])
-    entropy.index = model.m.X_train.index
-    entropy = entropy.apply(lambda x: get_entropy(x))
+    to_label = model.training_data[model.training_data['sub_sub_claim'].isna()][model.training_data['climate']]
+    print(to_label)
+    to_label['distribution'] =  model.m.model.predict_proba(vstack(to_label['vector'].values))
+    to_label['entropy'] = to_label['distribution'].apply(lambda x: get_entropy(x))
 
-    predicted = pd.Series(model.m.model.transduction_).apply(lambda x: int(x))
-    predicted.index = model.m.X_train.index
-    predicted = pd.concat([predicted, model.m.Y_test])
-
-
-
-    model.training_data= model.training_data.join(entropy.rename('entropy'), how = 'left')
-    model.training_data = model.training_data.join(predicted.rename('predicted'), how = 'left')
-    model.training_data.loc[~model.training_data.predicted.isna(),'predicted'] = model.d.encoder.inverse_transform( model.training_data.loc[~model.training_data.predicted.isna(),'predicted'].apply(lambda x: int(x)) )
-
-    model.d.get_labels(model.training_data, n = 50)
+    model.d.get_labels(to_label, n = 50)
     model.training_data =model.d.encode_labels(model.d.apply_labels(model.training_data))
 
     

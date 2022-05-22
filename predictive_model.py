@@ -16,6 +16,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from scipy.sparse import vstack
 
 class Predictive_model():
     def __init__(self,data, model = 'semi_supervised', kwargs = {}):
@@ -43,32 +44,19 @@ class Predictive_model():
             self.model_class = QuadraticDiscriminantAnalysis
 
 
-        labeled, unlabeled = [x for _,x in data.groupby(data['class'] == -1)]
+        labeled = data[~data['sub_sub_claim'].isna()]
         
         
-        X = labeled['vector'].apply(lambda x: np.array(x))
-        Y = labeled['class'].apply(lambda x: int(x))
+        self.X_train = labeled['vector'].apply(lambda x: np.array(x))
+        self.Y_train = labeled['class'].apply(lambda x: int(x))
 
-
-        self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(X, Y)
         
-        if model == 'semi_supervised':
-            self.X_train = pd.concat([self.X_train, unlabeled['vector'].apply(lambda x: np.array(x))])
-            self.Y_train = pd.concat([self.Y_train, unlabeled['class']]).apply(lambda x: int(x))
-
     
     def train(self):
         print('Training Model')
         self.model = self.model_class(**self.kwargs)
-        self.model.fit(np.stack(self.X_train.values), self.Y_train)
+        self.model.fit(vstack(self.X_train), self.Y_train)
 
     def predict(self, df):
-        return self.model.predict(np.stack(df['vector']))
+        return self.model.predict(vstack(df['vector']))
 
-    def evaluate(self):
-        y_hat = self.model.predict(np.stack(self.X_test))
-        cm = confusion_matrix(self.Y_test, y_hat, labels=self.model.classes_)
-        print(classification_report(self.Y_test, y_hat))
-        disp = ConfusionMatrixDisplay(confusion_matrix= cm)
-        disp.plot() 
-        plt.show()

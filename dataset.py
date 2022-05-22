@@ -24,11 +24,13 @@ import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime.combine(date.today(), datetime.min.time())- timedelta(weeks = 60)):
+    def __init__(self, from_date = datetime(2020,1,1)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
         except FileNotFoundError:
+
+            os.makedirs('./picklejar', exist_ok=True)
             self.timestamps=[]
             self.df_climate = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
             self.df_news = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
@@ -164,24 +166,22 @@ class Dataset():
         else:
             self.df_labels = pd.DataFrame(columns=['sub_sub_claim', 'timestamp'])
         df['sub_sub_claim'] = None
-        print(df[df['sub_sub_claim'].isna()].index.duplicated())
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
-        df.loc[df['sub_sub_claim'].isna(), 'sub_sub_claim'] = -1
         return df
 
 
     def encode_labels(self, df):
         self.encoder = LabelEncoder()
-        df.loc[df['sub_sub_claim'] != -1, 'class'] = self.encoder.fit_transform(df.loc[df['sub_sub_claim'] != -1, 'sub_sub_claim'])        
+        df.loc[~df['sub_sub_claim'].isna(), 'class'] = self.encoder.fit_transform(df.loc[~df['sub_sub_claim'].isna(), 'sub_sub_claim'])        
         df.loc[df['class'].isna(), 'class']  = -1        
         return df
 
     def get_labels(self, df, n=10):
-        to_label = df[df['class'] == -1].sort_values(['entropy'], ascending = False).iloc[:n]
-        for index, row in to_label.iterrows():
+        df = df.sort_values(['entropy'], ascending = False).iloc[:n]
+        for index, row in df.iterrows():
 
-            label = input(str(index) +': '+ str(row['predicted']) + ' @ ' +str(row['entropy'])+ '\n'+ row['sentence'] + '\n')
+            label = input(str(index) +': ' +str(row['entropy'])+ '\n'+ row['sentence'] + '\n')
             self.df_labels.loc[index] = [label, datetime.now()]
             self.df_labels.to_csv('labels.csv')
         
