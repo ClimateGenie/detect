@@ -7,7 +7,7 @@ import dill
 import pandas as pd
 
 class Filter():
-    def __init__(self,target_words,general_words,**kwargs):
+    def __init__(self,target_words,general_words,kwargs = {}):
 
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
@@ -39,7 +39,6 @@ class Filter():
         for word, val in tqdm(self.norm.iteritems(), total= len(self.norm), desc ='Filtering Sentences' ):
             df.loc[df['word'] == word,'p'] = val
             df.loc[df['word'] == word,'!p'] = 1-val
-        df.dropna(inplace= True)
         
         
         df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
@@ -50,7 +49,6 @@ class Filter():
         df_pr['climate'] = df_pr['prob'].apply(lambda x: x >= self.threshold)
         df_store['climate'] =  df_store.join(df_pr, how = 'left')['climate']
         df_store.loc[df_store['climate'].isna(),'climate'] = self.threshold <= 0.5
-        print(df_store)
         return df_store['climate']
 
     def predict_single(self, sentence):

@@ -5,6 +5,7 @@ from filter import Filter
 from predictive_model import Predictive_model
 import pandas as pd
 from utils import *
+from sklearn.model_selection import train_test_split
 
 
 class Model():
@@ -49,31 +50,28 @@ class Model():
         }
 
         """
-        self.args  = kwargs
+        self.args  = kwarg
+        self.d = Dataset()    
+        data = self.d.encode_labels(self.d.apply_labels(self.d.df_sentence))
+
+        self.training_data, self.test_data = train_test_split(data)
 
 
     def train(self):
-        d = Dataset()    
-        print(d.df_sentence[d.df_sentence.index.duplicated()])
-        self.training_data =d.encode_labels(d.apply_labels(d.df_sentence))
-        print(self.training_data)
 
-        f = Filter(d.climate_words(),d.news_words(), **self.args['filter'])
+        f = Filter(d.climate_words(),d.news_words(), self.args['filter'])
         f.train()
         self.training_data['climate'] = f.predict(self.training_data)
-        print(self.training_data)
 
         e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'], kwargs=self.args['embedding']['args'])
         e.train()
         self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
-        print(self.training_data)
 
         m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
         m.train()
-        print(self.training_data)
 
 
-        self.d, self.f, self.e, self.m = d,f,e,m
+        self.f, self.e, self.m = f,e,m
 
     def predict(self,series):
         df = pd.DataFrame(series, columns=['sentence'])

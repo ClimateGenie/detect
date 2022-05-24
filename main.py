@@ -10,8 +10,7 @@ model.train()
 
 while True:
     to_label = model.training_data[model.training_data['sub_sub_claim'].isna()][model.training_data['climate']]
-    print(to_label)
-    to_label['distribution'] =  model.m.model.predict_proba(vstack(to_label['vector'].values))
+    to_label['distribution'] = [*model.m.model.predict_proba(vstack(to_label['vector'].values))]
     to_label['entropy'] = to_label['distribution'].apply(lambda x: get_entropy(x))
 
     model.d.get_labels(to_label, n = 50)

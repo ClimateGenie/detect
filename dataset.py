@@ -39,6 +39,7 @@ class Dataset():
 
             resp = urlopen("https://drive.google.com/uc?export=download&id=1QXWbovm42oDDDs4xhxiV6taLMKpXBFTS")
             df = pd.read_json(BytesIO(resp.read()), compression='zip')
+
             df.index = df['ParagraphId'].apply(lambda x: UUID(int=x))
             self.df_seed = df
 
@@ -159,15 +160,16 @@ class Dataset():
     def apply_labels(self, df):
         if os.path.exists('labels.csv'):
             self.df_labels = pd.read_csv('labels.csv', index_col=0)
-            print(self.df_labels)
             self.df_labels.index = [uuid_mod.UUID(x) for x in self.df_labels.index]
             self.df_labels =  self.df_labels[~self.df_labels.index.duplicated()]
-            print(self.df_labels)
         else:
             self.df_labels = pd.DataFrame(columns=['sub_sub_claim', 'timestamp'])
         df['sub_sub_claim'] = None
+        
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
+
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
+
         return df
 
 
