@@ -7,17 +7,18 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from utils import *
 from random import choice, random
 import gensim
+from sklearn.preprocessing import LabelEncoder
 import os
 import numpy as np
 import logging
 import collections
 import pickle
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, hstack
 
 
 class Embedding():
 
-    def __init__(self,training_data,model_type = 'doc2vecdm', author_info = None, kwargs = {}):
+    def __init__(self,training_data,model_type = 'doc2vecdm', author_info = False, kwargs = {}):
 
 
         self.model_type = model_type
@@ -59,8 +60,14 @@ class Embedding():
             self.model.train(training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
 
         if self.author_info:
-            pass
-            
+            self.authors = pd.read_json('https://raw.githubusercontent.com/drmikecrowe/mbfcext/main/docs/v3/csources-pretty.json', orient='index')
+            self.authors.loc['dummy'] = np.nan
+            self.encoders = {}
+            for col in ['b','r','c','a','p']:
+                le= LabelEncoder()
+                le.fit(self.authors[col])
+                self.encoders[col] = le
+
 
 
     def predict(self, df):
@@ -78,8 +85,17 @@ class Embedding():
         for index, row in df[df['vector'].isna()].iterrows():
            vect  = self.predict_single(row['sentence'])
            df.at[index, 'vector'] = vect
-
         df['vector'] = df['vector'].apply(lambda x: csr_matrix(x))
+
+        if self.author_info:
+            df = df.merge(self.authors[['b','r','c','a','p']], left_on = 'domain', right_index = True,how = 'left')
+            for key, e in self.encoders.items():
+                df[key] = e.transform(df[key])
+            df['author_vect'] = df[['b','r','c','a','p']].values.tolist()
+            print(df['author_vect'])
+            df['author_vect'] = df['author_vect'].apply(lambda x: csr_matrix(np.array(x)))
+            df['vector'] = df.apply(lambda x: hstack([x['author_vect'], x['vector']] ), axis =1)
+
         return df['vector']
 
 

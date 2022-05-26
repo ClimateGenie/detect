@@ -183,8 +183,8 @@ class Dataset():
             self.df_labels.to_csv('labels.csv')
 
     def domains(self, df):
-        domains = df.to_frame().merge(pd.concat([self.df_news, self.df_climate, self.df_skeptics]), right_index = True, left_on = 'parent', how = 'left')['media_url']
-        domains = domains.apply(lambda x: urlparse(x).netloc)
+        domains = df.merge(pd.concat([self.df_news, self.df_climate, self.df_skeptics]), right_index = True, left_on = 'parent', how = 'left')['media_url']
+        domains.loc[~domains.isna()] = domains.loc[~domains.isna()].apply(lambda x: urlparse(x).netloc)
         return(domains)
         
 

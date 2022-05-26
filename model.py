@@ -1,3 +1,4 @@
+from enum import auto
 from sklearn import semi_supervised
 from dataset import Dataset
 from embedding import Embedding
@@ -17,6 +18,7 @@ class Model():
             },
         'embedding': {
             'model_type':'tfidf',
+            'author_info':True,
             'args': {}
             },
         'predictive_model': {
@@ -64,8 +66,8 @@ class Model():
         f.train()
         self.training_data['climate'] = f.predict(self.training_data)
 
-        self.training_data['domain'] = self.d.domains(self.training_data['climate'])
-        e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'], kwargs=self.args['embedding']['args'])
+        self.training_data['domain'] = self.d.domains(self.training_data)
+        e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'] ,author_info=self.args['embedding']['author_info'], kwargs=self.args['embedding']['args'])
         e.train()
 
         self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
@@ -78,8 +80,7 @@ class Model():
 
         self.f, self.e, self.m = f,e,m
 
-    def predict(self,series):
-        df = pd.DataFrame(series, columns=['sentence'])
+    def predict(self,df):
         df['climate'] = self.f.predict(df)
         df.loc[df['climate'] == True,'vector'] = self.e.predict(df[df['climate'] == True])
         df.loc[df['climate'] == True,'class'] = self.m.predict(df[df['climate'] == True])
@@ -108,5 +109,5 @@ class Model():
 if __name__ == "__main__":
     m = Model()
     m.train()
-    test = pd.Series(['Climate change is cool', 'Ice is not melting in antartica'])
-    a = m.predict(test)
+    df = pd.DataFrame({'sentence': ['Climate Change is cool', 'Ice is not melting in antartica'], 'domain':['abc.net.au', 'infowars.com']})
+    a = m.predict(df)
