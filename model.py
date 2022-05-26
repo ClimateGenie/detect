@@ -12,14 +12,15 @@ class Model():
 
     def __init__(self, kwargs = {
         'filter':{
-            'min_count': 5000
+            'model_size':50,
+            'threshold':0.7
             },
         'embedding': {
             'model_type':'tfidf',
             'args': {}
             },
         'predictive_model': {
-            'model_type':'random_forrest',
+            'model_type':'RandomForestClassifier',
             'args': {}
             }
         }) -> None:
@@ -34,38 +35,42 @@ class Model():
             'alpha':
             'min_count':
             'threshold':
+            'model_size':
 
         },
 
         'embedding': {
-            'model_type' =['doc2vecdbow','doc2vecdm','tfidf','bow', 'word2vecsum', 'word2vecmean' ]
+            'model_type':
             'args' = {}
         },
 
         'predictive_model': {
-            'model_type': ['semi_supervised', 'n_neighbors','rbf_svm','gaussian_process','decision_tree','random_forrest','nn','adaboost','qda'] 
+            'model_type': 
             'args' = {}
         }
 
         }
 
         """
-        self.args  = kwarg
+        self.args  = kwargs
         self.d = Dataset()    
-        data = self.d.encode_labels(self.d.apply_labels(self.d.df_sentence))
 
-        self.training_data, self.test_data = train_test_split(data)
+        self.training_data, self.test_data = train_test_split(self.d.df_sentence)
 
 
     def train(self):
 
-        f = Filter(d.climate_words(),d.news_words(), self.args['filter'])
+        f = Filter(self.d.climate_words(),self.d.news_words(), self.args['filter'])
         f.train()
         self.training_data['climate'] = f.predict(self.training_data)
 
+        self.training_data['domain'] = self.d.domains(self.training_data['climate'])
         e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'], kwargs=self.args['embedding']['args'])
         e.train()
+
         self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
+
+        self.training_data = self.d.encode_labels(self.d.apply_labels(self.training_data))
 
         m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
         m.train()

@@ -1,4 +1,5 @@
 from time import sleep
+from urllib.parse import urlparse
 from pandas.core.indexes.api import default_index
 from sklearn.preprocessing import LabelEncoder
 from io import BytesIO
@@ -24,7 +25,7 @@ import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime(2020,1,1)):
+    def __init__(self, from_date = datetime(2018,1,1)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -104,15 +105,9 @@ class Dataset():
             df_sentence.set_index(['uuid'], inplace=True)
             self.df_sentence = pd.concat([self.df_sentence,df_sentence[['parent','sentence']]])
 
-
             self.save()
 
 
-        else:
-            self.reload = False
-
-
-        
     def get_links(self,date_int, subreddit):
         url = 'https://api.pushshift.io/reddit/search/submission/?subreddit='+ subreddit +'&sort=asc&sort_type=num_comments&after=' + str(int(date_int)) + '&before='+str(int(date_int + 86400)) +'&size=5'
         res = None
@@ -186,6 +181,11 @@ class Dataset():
             label = input(str(index) +': ' +str(row['entropy'])+ '\n'+ row['sentence'] + '\n')
             self.df_labels.loc[index] = [label, datetime.now()]
             self.df_labels.to_csv('labels.csv')
+
+    def domains(self, df):
+        domains = df.to_frame().merge(pd.concat([self.df_news, self.df_climate, self.df_skeptics]), right_index = True, left_on = 'parent', how = 'left')['media_url']
+        domains = domains.apply(lambda x: urlparse(x).netloc)
+        return(domains)
         
 
 

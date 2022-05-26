@@ -12,8 +12,11 @@ class Filter():
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
         self.threshold = kwargs.get('threshold', 0.9)
+        self.model_size = kwargs.get('model_size', 500)
+
         self.target_words =flatten(simple_map(word_token,target_words))
         self.general_words =flatten(simple_map(word_token, general_words))
+        self.n_sentence = len(target_words)+len(general_words)
 
 
     def train(self):
@@ -29,6 +32,30 @@ class Filter():
         self.ratio = {k: (self.normed_target[k] +self.alpha)*sum(self.normed_general.values())/(self.normed_general[k] + 2*self.alpha)/sum(self.normed_target.values())  for k in word_dict }
         self.norm = pd.Series({k: v/(v+1)  for k,v in self.ratio.items()})
 
+
+
+        """
+        Find which words in dictionary provide the most information about any given sentence.
+
+        info from pr -> greatest deviation from 0.5
+        
+        combining this with the probabilty that a word apears in a sentence
+        
+        
+        minimising expected loss:
+            if a word is removed from the model, it maps to a probabilty of 0.5, which correspond to a information loss of abs(pr-0.5)
+            for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
+        """
+
+        stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
+        stat['pr'] = abs(stat['pr']-0.5)
+        stat['count'] = stat['count']/self.n_sentence
+        stat['score'] = stat.apply(lambda x: x['pr']*x['count'], axis = 1)
+        indecies = stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
+
+        self.norm = self.norm.loc[indecies]
+
+
     def predict(self, df):
         df_store = df.copy()
         df['word'] = df['sentence'].apply(lambda x: word_token(x))
@@ -36,7 +63,7 @@ class Filter():
 
 
         df[['p', '!p']] = None,None
-        for word, val in tqdm(self.norm.iteritems(), total= len(self.norm), desc ='Filtering Sentences' ):
+        for word, val in self.norm.iteritems():
             df.loc[df['word'] == word,'p'] = val
             df.loc[df['word'] == word,'!p'] = 1-val
         

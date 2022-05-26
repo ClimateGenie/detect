@@ -17,12 +17,13 @@ from scipy.sparse import csr_matrix
 
 class Embedding():
 
-    def __init__(self,training_data,model_type = 'doc2vecdm', kwargs = {}):
+    def __init__(self,training_data,model_type = 'doc2vecdm', author_info = None, kwargs = {}):
 
 
         self.model_type = model_type
         self.training_data = training_data['sentence']
         self.args = kwargs
+        self.author_info = author_info
 
 
     
@@ -57,9 +58,13 @@ class Embedding():
             self.model.build_vocab(corpus_iterable = training_data)
             self.model.train(training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
 
+        if self.author_info:
+            pass
+            
+
 
     def predict(self, df):
-        ## First do senteces found in the datase
+        ## First do senteces found in the dataset
         if self.model in ['doc2vecdbow', 'doc2vecdm']:
             vectors = pd.Series(self.model.dv[self.training_data.index].tolist())
             vectors.index = self.training_data.index

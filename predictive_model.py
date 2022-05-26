@@ -35,7 +35,7 @@ class Predictive_model():
             self.model_class = RidgeClassifier
         elif model == 'PassiveAggressiveClassifier':
             self.model_class = PassiveAggressiveClassifier
-        elif model == 'AdaBoostClassifier'
+        elif model == 'AdaBoostClassifier':
             self.model_class = AdaBoostClassifier
         elif model == 'GradientBoostingClassifier':
             self.model_class = GradientBoostingClassifier
