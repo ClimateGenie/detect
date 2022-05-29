@@ -1,6 +1,5 @@
-from enum import auto
-from sklearn import semi_supervised
 from dataset import Dataset
+import numpy as np
 from embedding import Embedding
 from filter import Filter
 from predictive_model import Predictive_model
@@ -55,24 +54,18 @@ class Model():
 
         """
         self.args  = kwargs
-        self.d = Dataset()    
 
-        self.training_data, self.test_data = train_test_split(self.d.df_sentence)
+    def train(self,training_data):
+        self.training_data = training_data
 
-
-    def train(self):
-
-        f = Filter(self.d.climate_words(),self.d.news_words(), self.args['filter'])
+        f = Filter(self.training_data[training_data['weak_climate']]['sentence'],self.training_data[~training_data['weak_climate']]['sentence'], self.args['filter'])
         f.train()
         self.training_data['climate'] = f.predict(self.training_data)
 
-        self.training_data['domain'] = self.d.domains(self.training_data)
         e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'] ,author_info=self.args['embedding']['author_info'], kwargs=self.args['embedding']['args'])
         e.train()
 
         self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
-
-        self.training_data = self.d.encode_labels(self.d.apply_labels(self.training_data))
 
         m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
         m.train()
@@ -86,7 +79,6 @@ class Model():
         df.loc[df['climate'] == True,'class'] = self.m.predict(df[df['climate'] == True])
         df.loc[df['class'].isna(),'class'] = 0
         df['class'] = df['class'].apply(lambda x: int(x))
-        df['predicted'] = self.d.encoder.inverse_transform(df['class'])
 
         return df
         
@@ -108,6 +100,13 @@ class Model():
 
 if __name__ == "__main__":
     m = Model()
-    m.train()
+    d = Dataset()    
+    training_data = d.encode_labels(d.apply_labels(d.df_sentence))
+    training_data['domain'] = d.domains(training_data)
+    training_data['weak_climate'] =  training_data['parent'].isin(np.concatenate((d.df_seed.index,d.df_climate.index,d.df_skeptics.index)))
+    m.train(training_data)
+
+
     df = pd.DataFrame({'sentence': ['Climate Change is cool', 'Ice is not melting in antartica'], 'domain':['abc.net.au', 'infowars.com']})
     a = m.predict(df)
+    a['predicted'] = d.encoder.inverse_transform(df['class'])

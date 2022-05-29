@@ -5,6 +5,9 @@ from sklearn.metrics import classification_report
 from itertools import product
 from utils import simple_map
 from copy import copy
+from model import Model
+from embedding import Embedding
+from predictive_model import Predictive_model
 
 
 """
@@ -28,6 +31,9 @@ This is then being tested using the Clima-Text Dataset which gives climate sente
 """
 
 d = Dataset()
+
+model = Model()
+
 climate_words = d.climate_words().copy()
 news_words = d.news_words().copy()
 test = pd.read_csv('https://www.sustainablefinance.uzh.ch/dam/jcr:ed47e4e1-353a-42cc-9f2e-0f199b85815a/Wiki-Doc-Dev.tsv', sep = '\t')
@@ -57,6 +63,17 @@ df_filter['f'] = [copy(f) for x in range(len(df_filter))]
 
 df_filter['report'] = simple_map(evaluate_filter, df_filter.to_dict('records'))
 df_filter['f1'] = df_filter['report'].apply(lambda x: x['macro avg']['f1-score'])
-
 df_filter.to_pickle('./picklejar/filter_eval.pickle')
+
+
+best_filter =  df_filter.sort_values('f1').iloc[0,'f']
+
+model.f = best_filter
+
+
+
+
+
+
+
 
