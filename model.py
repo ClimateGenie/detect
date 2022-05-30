@@ -12,7 +12,7 @@ class Model():
 
     def __init__(self, kwargs = {
         'filter':{
-            'model_size':50,
+            'model_size':100,
             'threshold':0.7
             },
         'embedding': {
@@ -55,23 +55,22 @@ class Model():
         """
         self.args  = kwargs
 
+        self.filter = Filter( self.args['filter'])
+        self.embedding_scheme = Embedding( model_type=self.args['embedding']['model_type'] ,author_info=self.args['embedding']['author_info'], kwargs=self.args['embedding']['args'])
+        self.predictive_model = Predictive_model(model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
+
     def train(self,training_data):
         self.training_data = training_data
 
-        f = Filter(self.training_data[training_data['weak_climate']]['sentence'],self.training_data[~training_data['weak_climate']]['sentence'], self.args['filter'])
-        f.train()
-        self.training_data['climate'] = f.predict(self.training_data)
+        self.filter.train(self.training_data[training_data['weak_climate']]['sentence'],self.training_data[~training_data['weak_climate']]['sentence'])
+        self.training_data['climate'] = self.filter.predict(self.training_data)
 
-        e = Embedding(self.training_data[self.training_data['climate'] == True], model_type=self.args['embedding']['model_type'] ,author_info=self.args['embedding']['author_info'], kwargs=self.args['embedding']['args'])
-        e.train()
+        self.embedding_scheme.train(self.training_data[self.training_data['climate'] == True])
+        self.training_data['vector'] = self.embedding_scheme.predict(self.training_data[self.training_data['climate'] == True])
 
-        self.training_data['vector'] = e.predict(self.training_data[self.training_data['climate'] == True])
-
-        m = Predictive_model(self.training_data[self.training_data['climate'] == True], model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
-        m.train()
+        self.predictive_model.train(self.training_data[self.training_data['climate'] == True])
 
 
-        self.f, self.e, self.m = f,e,m
 
     def predict(self,df):
         df['climate'] = self.f.predict(df)
@@ -107,6 +106,6 @@ if __name__ == "__main__":
     m.train(training_data)
 
 
-    df = pd.DataFrame({'sentence': ['Climate Change is cool', 'Ice is not melting in antartica'], 'domain':['abc.net.au', 'infowars.com']})
+    df = pd.DataFrame({'sentence': ['Climate Change is cool', 'Ice is not melting in antartica'], 'domain':['abc.net.au', None]})
     a = m.predict(df)
     a['predicted'] = d.encoder.inverse_transform(df['class'])

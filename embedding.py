@@ -18,19 +18,19 @@ from scipy.sparse import csr_matrix, hstack
 
 class Embedding():
 
-    def __init__(self,training_data,model_type = 'doc2vecdm', author_info = False, kwargs = {}):
+    def __init__(self,model_type = 'doc2vecdm', author_info = False, kwargs = {}):
 
 
         self.model_type = model_type
-        self.training_data = training_data['sentence']
         self.args = kwargs
         self.author_info = author_info
 
 
     
 
-    def train(self):
+    def train(self, training_data):
         print('Training Embedding Scheme')
+        self.training_data = training_data
 
         if self.model_type == 'doc2vecdm':
             training_data = [gensim.models.doc2vec.TaggedDocument(word_token(x),[i]) for i,x in self.training_data.iteritems()]

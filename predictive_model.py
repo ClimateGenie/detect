@@ -22,7 +22,7 @@ from sklearn.linear_model import Perceptron
 from sklearn.svm import SVC
 
 class Predictive_model():
-    def __init__(self,data, model = 'ExtraTreeClassifier', kwargs = {}):
+    def __init__(self, model = 'ExtraTreeClassifier', kwargs = {}):
 
         self.kwargs = kwargs
         if model == 'ExtraTree':
@@ -66,15 +66,12 @@ class Predictive_model():
             
 
 
-        labeled = data[~data['sub_sub_claim'].isna()]
-        
-        
-        self.X_train = labeled['vector'].apply(lambda x: np.array(x))
-        self.Y_train = labeled['class'].apply(lambda x: int(x))
-
         
     
-    def train(self):
+    def train(self, training_data):
+        labeled = training_data[~training_data['sub_sub_claim'].isna()]
+        self.X_train = labeled['vector'].apply(lambda x: np.array(x))
+        self.Y_train = labeled['class'].apply(lambda x: int(x))
         print('Training Model')
         self.model = self.model_class(**self.kwargs)
         self.model.fit(vstack(self.X_train), self.Y_train)
