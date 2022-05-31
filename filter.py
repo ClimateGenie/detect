@@ -9,15 +9,16 @@ import pandas as pd
 class Filter():
     def __init__(self,kwargs = {}):
 
+        print(kwargs)
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
         self.threshold = kwargs.get('threshold', 0.9)
-        self.model_size = kwargs.get('model_size', 500)
+        self.model_size = int(kwargs.get('model_size', 500))
 
 
     def train(self, target_words,general_words):
-        self.target_words =flatten(simple_map(word_token,target_words))
-        self.general_words =flatten(simple_map(word_token, general_words))
+        self.target_words =flatten(map(word_token,target_words))
+        self.general_words =flatten(map(word_token, general_words))
         self.n_sentence = len(target_words)+len(general_words)
 
 
@@ -65,7 +66,7 @@ class Filter():
 
 
         df[['p', '!p']] = None,None
-        for word, val in self.norm.iteritems():
+        for word, val in tqdm(self.norm.iteritems(), total=len(self.norm)):
             df.loc[df['word'] == word,'p'] = val
             df.loc[df['word'] == word,'!p'] = 1-val
         

@@ -33,28 +33,28 @@ class Embedding():
         self.training_data = training_data
 
         if self.model_type == 'doc2vecdm':
-            training_data = [gensim.models.doc2vec.TaggedDocument(word_token(x),[i]) for i,x in self.training_data.iteritems()]
+            training_data = [gensim.models.doc2vec.TaggedDocument(word_token(x),[i]) for i,x in self.training_data['sentence'].iteritems()]
             self.model = gensim.models.doc2vec.Doc2Vec(**self.args)
             self.model.build_vocab(corpus_iterable = training_data)
             self.model.train(training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
 
 
         elif self.model_type == 'doc2vecdbow':
-            training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in self.training_data.iteritems()]
+            training_data = [gensim.models.doc2vec.TaggedDocument(x,[i]) for i,x in self.training_data['sentence'].iteritems()]
             self.model = gensim.models.doc2vec.Doc2Vec(**self.args)
             self.model.build_vocab(corpus_iterable = training_data)
             self.model.train(training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
 
         elif self.model_type == 'tfidf':
             self.model = TfidfVectorizer(**self.args)
-            self.model.fit(self.training_data)
+            self.model.fit(self.training_data['sentence'])
 
         elif self.model_type == 'bow':
             self.model = CountVectorizer(**self.args)
-            self.model.fit(self.training_data)
+            self.model.fit(self.training_data['sentence'])
 
         elif self.model_type in ['word2vecsum', 'word2vecmean']:
-            training_data = simple_map(word_token, self.training_data)
+            training_data = simple_map(word_token, self.training_data['sentence'])
             self.model = gensim.models.word2vec.Word2Vec(**self.args)
             self.model.build_vocab(corpus_iterable = training_data)
             self.model.train(training_data, total_examples=self.model.corpus_count, epochs = self.model.epochs)
@@ -71,7 +71,7 @@ class Embedding():
 
 
     def predict(self, df):
-        ## First do senteces found in the dataset
+        ## First do sentece found in the dataset
         if self.model in ['doc2vecdbow', 'doc2vecdm']:
             vectors = pd.Series(self.model.dv[self.training_data.index].tolist())
             vectors.index = self.training_data.index
