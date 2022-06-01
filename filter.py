@@ -9,7 +9,6 @@ import pandas as pd
 class Filter():
     def __init__(self,kwargs = {}):
 
-        print(kwargs)
         self.alpha = kwargs.get('alpha',1)
         self.min_count = kwargs.get('min_count', 10)
         self.threshold = kwargs.get('threshold', 0.9)
@@ -50,13 +49,13 @@ class Filter():
             for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
         """
 
-        stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
-        stat['pr'] = abs(stat['pr']-0.5)
-        stat['count'] = stat['count']/self.n_sentence
-        stat['score'] = stat.apply(lambda x: x['pr']*x['count'], axis = 1)
-        indecies = stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
+        self.stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
+        self.stat['pr'] = abs(self.stat['pr']-0.5)
+        self.stat['count'] = self.stat['count']/self.n_sentence
+        self.stat['score'] = self.stat.apply(lambda x: x['pr']*x['count'], axis = 1)
+        indecies = self.stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
 
-        self.norm = self.norm.loc[indecies]
+        self.model = self.norm.loc[indecies]
 
 
     def predict(self, df):
@@ -66,7 +65,7 @@ class Filter():
 
 
         df[['p', '!p']] = None,None
-        for word, val in tqdm(self.norm.iteritems(), total=len(self.norm)):
+        for word, val in tqdm(self.model.iteritems(), total=len(self.model)):
             df.loc[df['word'] == word,'p'] = val
             df.loc[df['word'] == word,'!p'] = 1-val
         
@@ -82,9 +81,9 @@ class Filter():
         return df_store['climate']
 
     def predict_single(self, sentence):
-        words = [x for x in word_token(sentence) if x in self.norm.index]
+        words = [x for x in word_token(sentence) if x in self.model.index]
         if len(words):
-            probs = self.norm[words]
+            probs = self.model[words]
             pr =  product(probs)/(product(probs) + product([1-x for x in probs]))
         else:
             pr =  0.5

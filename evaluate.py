@@ -1,4 +1,7 @@
+from math import prod
+from posixpath import altsep
 from numpy import mod
+from numpy.random.mtrand import sample
 from filter import Filter
 from dataset import Dataset
 import pandas as pd
@@ -10,6 +13,7 @@ from copy import copy
 from model import Model
 from embedding import Embedding
 from predictive_model import Predictive_model
+import numpy as np
 
 
 """
@@ -33,82 +37,57 @@ This is then being tested using the Clima-Text Dataset which gives climate sente
 """
 
 d = Dataset()
-
-model = Model()
-
-
-climate_words = d.climate_words().copy()
-news_words = d.news_words().copy()
-test = pd.read_csv('https://www.sustainablefinance.uzh.ch/dam/jcr:ed47e4e1-353a-42cc-9f2e-0f199b85815a/Wiki-Doc-Dev.tsv', sep = '\t')
-
-
-def evaluate_filter(f):
-    test_cp = test.copy()
-    test_cp['predicted'] = f.predict(test_cp)
-    report = classification_report(test_cp['label'], test_cp['predicted'], output_dict=True)
-    return report
-
-def return_trained(f):
-    print(f.min_count, f.alpha,f.threshold,f.model_size)
-    f.train(climate_words, news_words)
-    return f
-
-'''
-min_count = [10**x for x in range(0,6)]
-model_size = [10**x for x in range(0,6)] 
-alpha = [10*x for x in range(0,6)]
-threshold = [0.1 *x for x in range(5,11)]
-'''
-min_count = [10**x for x in range(0,1)]
-model_size = [10**x for x in range(2,3)] 
-alpha = [10*x for x in range(0,1)]
-threshold = [0.1 *x for x in range(7,8)]
-
-df_filter = pd.DataFrame(list(product(min_count,model_size,alpha,threshold)), columns=['min_count','model_size','alpha','threshold'])
-df_filter['f'] = df_filter.apply(lambda x: Filter(kwargs={'min_count': x['min_count'],'model_size': x['model_size'],'alpha': x['alpha'], 'threshold': x['threshold']}), axis = 1)
-
-df_filter['f'] = simple_map(return_trained, df_filter['f'])
-df_filter['report'] = simple_map(evaluate_filter, df_filter['f'])
-df_filter['f1'] = df_filter['report'].apply(lambda x: x['macro avg']['f1-score'])
-
-
-df_filter.to_pickle('./picklejar/filter_eval.pickle')
-
-df_filter = pd.read_pickle('./picklejar/filter_eval.pickle')
-
-best_filter =  (df_filter.sort_values('f1')).iloc[0]['f']
-
-model.filter = best_filter
-
-## Since embedding scheme can only be tested as part of the predictive model both have to be evaluated together
-
-embedding_parms = ['doc2vecdm','doc2vecdbow','tfidf','bow','word2vecsum', 'word2vecmean']
-author_info = [True, False]
-predictive_model_parms = ['ExtraTree','DecisionTree','SGDClassifier','RidgeClassifier','PassiveAggressiveClassifier','AdaBoostClassifier','GradientBoostingClassifier', 'BaggingClassifier','ExtraTreeClassifier','RandomForestClassifier','BernoulliNB','LinearSVC','LogisticRegression','LogisticRegressionCV','MultinomialNB','NearestCentroid','NuSVC','Perceptron','SVC']
-
-df_model = pd.DataFrame(columns=['min_count','model_size','alpha','threshold'])
-
 data = d.encode_labels(d.apply_labels(d.df_sentence))
 data['domain'] = d.domains(data)
+data['weak_climate'] =  data['parent'].isin(np.concatenate((d.df_seed.index,d.df_climate.index,d.df_skeptics.index)))
 
-data['climate'] = best_filter.predict(data)
-## Remove unlabled and non-climate data
-print('Filtering')
-data = data[data['climate']]
+min_count_parms = [10**x for x in range(0,4)]
+model_size_parms = [10**x for x in range(0,5)] 
+alpha_parms = [10*x for x in range(0,3)]
+threshold_parms = [0.1 *x for x in range(5,11)]
+embedding_parms = ['doc2vecdm','doc2vecdbow','tfidf','bow','word2vecsum', 'word2vecmean']
+author_info_parms = [True, False]
+predictive_model_parms = ['ExtraTree','DecisionTree','SGDClassifier','RidgeClassifier','PassiveAggressiveClassifier','AdaBoostClassifier','GradientBoostingClassifier', 'BaggingClassifier','ExtraTreeClassifier','RandomForestClassifier','BernoulliNB','LinearSVC','LogisticRegression','LogisticRegressionCV','MultinomialNB','NearestCentroid','NuSVC','Perceptron','SVC']
+unlabled_frac = [2**(-x) for x in range(8,11)]
+labeled_frac = [0.1*x for x in range(1,10)] ## Will need a minimum of 10% for testing
 
-labeled, unlabled = [x for _, x in data.group_by(data['labeled']!=-1)]
+df_eval = pd.DataFrame(columns=['min_count','model_size','alpha','threshold','embedding_parms','author_info','predictive_model_parms','unlabled','labeled', 'model'])
 
-print(labeled, unlabled)
-train, test = train_test_split(data)
+labeled_data, unlabled_data = [x for _, x in data.groupby(data['class']==-1)]
 
-for embedding in embedding_parms:
-    for author in author_info:
-        model.embedding_scheme = Embedding(model_type= embedding, author_info=author)
-        print(embedding,author)
-        model.embedding_scheme.train(train)
-        train['vector'] = model.embedding_scheme.predict(train)
-        for predictive_model in predictive_model_parms:
-            model.predictive_model = Predictive_model(model=predictive_model)
-            print(embedding,author,predictive_model)
-            model.predictive_model.train(data)
+## First build the various traioning sets
+i = 0
+total = prod([len(min_count_parms), len(model_size_parms),len(alpha_parms),len(threshold_parms),len(unlabled_frac),len(labeled_frac)])
+print(total)
+for u in unlabled_frac:
+    train_unlabeled = unlabled_data.sample(frac=u, random_state=1)
+    for l in labeled_frac:
+        train_labeled, test = train_test_split(labeled_data,train_size = l, random_state=1)
+        train = pd.concat([train_labeled, train_unlabeled])
+        ## Now initialise a filter
+        for min_count in min_count_parms:
+            for alpha in alpha_parms:
+                ## Due to how the filter is built, it can be trained once and altered each time for treashold and model_size
+                f = Filter({'min_count':min_count,'alpha':alpha})
+                f.train(train[train['weak_climate']]['sentence'],train[~train['weak_climate']]['sentence'])
+                for model_size in model_size_parms:
+                    f.model_size = model_size
+                    indecies = f.stat.sort_values('score',ascending = False).iloc[0:f.model_size,].index
+                    f.model = f.norm.loc[indecies]
+                    for threshold in threshold_parms:
+                        f.threshold = threshold
+                        train['climate'] = f.predict(train)
+                        for embedding_scheme in embedding_parms:
+                            for author_info in author_info_parms:
+                                e = Embedding(model_type=embedding_scheme,author_info=author_info)
+                                e.train(train[train['climate']])
+                                train['vector']= e.predict(train[train['climate']])
+                                for predictive_model in predictive_model_parms:
+                                    m = Predictive_model(model=predictive_model)
+                                    m.train(train[train['climate']])
+                                    model = Model()
+                                    model.filter = f
+                                    model.embedding_scheme = e
+                                    model.predictive_model = m
+                                    df_eval.loc[len(df_eval)] = [min_count,model_size,alpha,threshold,embedding_scheme,author_info,predictive_model,len(train_unlabeled), len(train_labeled), model]
 
