@@ -25,7 +25,7 @@ import uuid as uuid_mod
 
 
 class Dataset():
-    def __init__(self, from_date = datetime(2018,1,1)):
+    def __init__(self, from_date = datetime(2018,1,1), to_date = datetime(2022,5,31)):
         warnings.filterwarnings('ignore')
         try:
             self.load()
@@ -56,7 +56,7 @@ class Dataset():
         utc = pytz.UTC
         day = utc.localize(from_date)
         new_timestamps = []
-        while day < utc.localize(datetime.utcnow()-timedelta(days = 2)):
+        while day < utc.localize(to_date):
             if day.timestamp() in self.timestamps:
                 day += timedelta(days =1)
             else:

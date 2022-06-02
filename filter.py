@@ -58,16 +58,18 @@ class Filter():
         self.model = self.norm.loc[indecies]
 
 
-    def predict(self, df):
+    def predict(self, df, return_prob = False):
         df_store = df.copy()
         df['word'] = df['sentence'].apply(lambda x: word_token(x))
         df = df.explode('word')
 
+        words = set(self.model.index).intersection(set(df['word']))
+
 
         df[['p', '!p']] = None,None
-        for word, val in tqdm(self.model.iteritems(), total=len(self.model)):
-            df.loc[df['word'] == word,'p'] = val
-            df.loc[df['word'] == word,'!p'] = 1-val
+        for word in tqdm(words, total=len(words)):
+            df.loc[df['word'] == word,'p'] = self.model[word]
+            df.loc[df['word'] == word,'!p'] = 1-self.model[word]
         
         
         df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
@@ -76,9 +78,12 @@ class Filter():
 
         df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
         df_pr['climate'] = df_pr['prob'].apply(lambda x: x >= self.threshold)
-        df_store['climate'] =  df_store.join(df_pr, how = 'left')['climate']
+        df_store =  df_store.join(df_pr, how = 'left',lsuffix='old')
         df_store.loc[df_store['climate'].isna(),'climate'] = self.threshold <= 0.5
-        return df_store['climate']
+        if return_prob:
+            return df_store['prob']
+        else:
+            return df_store['climate']
 
     def predict_single(self, sentence):
         words = [x for x in word_token(sentence) if x in self.model.index]
