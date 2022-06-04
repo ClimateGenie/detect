@@ -48,37 +48,43 @@ class Filter():
             if a word is removed from the model, it maps to a probabilty of 0.5, which correspond to a information loss of abs(pr-0.5)
             for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
         """
+        if len(self.norm) > 0:
+            self.stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
+            self.stat['pr'] = abs(self.stat['pr']-0.5)
+            self.stat['count'] = self.stat['count']/self.n_sentence
+            self.stat['score'] = self.stat.apply(lambda x: x['pr']*x['count'], axis = 1)
+            indecies = self.stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
 
-        self.stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
-        self.stat['pr'] = abs(self.stat['pr']-0.5)
-        self.stat['count'] = self.stat['count']/self.n_sentence
-        self.stat['score'] = self.stat.apply(lambda x: x['pr']*x['count'], axis = 1)
-        indecies = self.stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
-
-        self.model = self.norm.loc[indecies]
+            self.model = self.norm.loc[indecies]
+        else:
+            self.model = self.norm
 
 
     def predict(self, df, return_prob = False):
         df_store = df.copy()
-        df['word'] = df['sentence'].apply(lambda x: word_token(x))
-        df = df.explode('word')
+        if len(self.model) >0:
+            df['word'] = df['sentence'].apply(lambda x: word_token(x))
+            df = df.explode('word')
 
-        words = set(self.model.index).intersection(set(df['word']))
-
-
-        df[['p', '!p']] = None,None
-        for word in tqdm(words, total=len(words)):
-            df.loc[df['word'] == word,'p'] = self.model[word]
-            df.loc[df['word'] == word,'!p'] = 1-self.model[word]
-        
-        
-        df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
+            words = set(self.model.index).intersection(set(df['word']))
 
 
+            df[['p', '!p']] = None,None
+            for word in tqdm(words, total=len(words)):
+                df.loc[df['word'] == word,'p'] = self.model[word]
+                df.loc[df['word'] == word,'!p'] = 1-self.model[word]
+            
+            
+            df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
 
-        df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
-        df_pr['climate'] = df_pr['prob'].apply(lambda x: x >= self.threshold)
-        df_store =  df_store.join(df_pr, how = 'left',lsuffix='old')
+
+
+            df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])
+            df_pr['climate'] = df_pr['prob'].apply(lambda x: x >= self.threshold)
+            df_store =  df_store.join(df_pr, how = 'left',lsuffix='old')
+        else:
+            df_store['prob'] = 0.5
+            df_store['climate'] = df_store['prob'].apply(lambda x: x >= self.threshold)
         df_store.loc[df_store['climate'].isna(),'climate'] = self.threshold <= 0.5
         if return_prob:
             return df_store['prob']

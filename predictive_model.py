@@ -72,7 +72,7 @@ class Predictive_model():
         labeled = training_data[~training_data['sub_sub_claim'].isna()]
         self.X_train = labeled['vector'].apply(lambda x: np.array(x))
         self.Y_train = labeled['class'].apply(lambda x: int(x))
-        print('Training Model')
+        print(self.model_class,self.X_train[0].A)
         self.model = self.model_class(**self.kwargs)
         self.model.fit(vstack(self.X_train), self.Y_train)
 
