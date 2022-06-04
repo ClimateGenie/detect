@@ -60,15 +60,16 @@ class Model():
         self.predictive_model = Predictive_model(model=self.args['predictive_model']['model_type'],kwargs=  self.args['predictive_model']['args'])
 
     def train(self,training_data):
-        self.training_data = training_data
+        labeled_data, unlabled_data = [x for _, x in training_data.groupby(training_data['class']==-1)]
 
-        self.filter.train(self.training_data[training_data['weak_climate']]['sentence'],self.training_data[~training_data['weak_climate']]['sentence'])
-        self.training_data['climate'] = self.filter.predict(self.training_data)
+        self.filter.train(unlabled_data[training_data['weak_climate']]['sentence'],unlabled_data[~training_data['weak_climate']]['sentence'])
+        unlabled_data = unlabled_data[self.filter.predict(unlabled_data)]
+        labeled_data = labeled_data[self.filter.predict(labeled_data)]
 
-        self.embedding_scheme.train(self.training_data[self.training_data['climate'] == True])
-        self.training_data['vector'] = self.embedding_scheme.predict(self.training_data[self.training_data['climate'] == True])
+        self.embedding_scheme.train(unlabled_data)
+        labeled_data['vector'] = self.embedding_scheme.predict(labeled_data)
 
-        self.predictive_model.train(self.training_data[self.training_data['climate'] == True])
+        self.predictive_model.train(labeled_data)
 
 
 
@@ -82,7 +83,6 @@ class Model():
         return df
         
         
-
 
     def save(self):
         print('Pickling Filter')
