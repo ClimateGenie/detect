@@ -34,7 +34,7 @@ class Dataset():
             os.makedirs('./picklejar', exist_ok=True)
             self.timestamps=[]
             self.df_climate = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
-            self.df_news = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
+            self.df_general = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
             self.df_skeptics = pd.DataFrame(columns= ['author','timestamp','post_url','media_url','score','comments'])
             self.df_sentence = pd.DataFrame(columns=['parent', 'sentence'])
 
@@ -69,33 +69,41 @@ class Dataset():
             self.reload = True
             print('Fetching for ' + ', '.join([datetime.fromtimestamp(x).strftime('%Y-%m-%d') for x in new_timestamps]))
 
-            climate_urls = flatten([ [self.get_links(date,'climate') for date in tqdm(new_timestamps,total=len(new_timestamps))],  [self.get_links(date,'environment') for date in tqdm(new_timestamps,total=len(new_timestamps))]   ])
-            news_urls = flatten([ [self.get_links(date,'news') for date in tqdm(new_timestamps,total=len(new_timestamps))],  [self.get_links(date,'worldnews') for date in tqdm(new_timestamps,total=len(new_timestamps))]   ])
+            climate_urls = flatten([    [self.get_links(date,'climate') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'environment') for date in tqdm(new_timestamps,total=len(new_timestamps))]
+                                        ])
+            general_urls = flatten([    [self.get_links(date,'news') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'worldnews') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'TIL') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'AutoNewspaper') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'NewsOfTheStupid') for date in tqdm(new_timestamps,total=len(new_timestamps))],
+                                        [self.get_links(date,'NewsOfTheWeird') for date in tqdm(new_timestamps,total=len(new_timestamps))]
+                                        ])
             climateskeptics_urls =  [self.get_links(date,'climateskeptics') for date in tqdm(new_timestamps,total=len(new_timestamps))]
 
             df_climate = pd.DataFrame(flatten(climate_urls),columns= ['author','timestamp','post_url','media_url','score','comments','uuid'])
-            df_news = pd.DataFrame(flatten(news_urls),columns= ['author','timestamp','post_url','media_url','score','comments','uuid'])
+            df_general = pd.DataFrame(flatten(general_urls),columns= ['author','timestamp','post_url','media_url','score','comments','uuid'])
             df_skeptics = pd.DataFrame(flatten(climateskeptics_urls),columns= ['author','timestamp','post_url','media_url','score','comments','uuid'])
 
 
             df_climate['article'] = simple_map(self.get_articles, df_climate['media_url'], 'Fetching Climate Articles')
-            df_news['article'] = simple_map(self.get_articles, df_news['media_url'], 'Fetching News Articles')
+            df_general['article'] = simple_map(self.get_articles, df_general['media_url'], 'Fetching News Articles')
             df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'], 'Fetching Skeptics Articles')
 
 
             df_climate['uuid'] = simple_map(uuid, df_climate['post_url'])
-            df_news['uuid'] = simple_map(uuid, df_news['post_url'])
+            df_general['uuid'] = simple_map(uuid, df_general['post_url'])
             df_skeptics['uuid'] = simple_map(uuid, df_skeptics['post_url'])
 
             df_climate.set_index(['uuid'], inplace=True)
-            df_news.set_index(['uuid'], inplace=True)
+            df_general.set_index(['uuid'], inplace=True)
             df_skeptics.set_index(['uuid'], inplace=True)
 
             self.df_climate = pd.concat([self.df_climate,df_climate])
-            self.df_news = pd.concat([self.df_news,df_news])
+            self.df_general = pd.concat([self.df_general,df_general])
             self.df_skeptics = pd.concat([self.df_skeptics,df_skeptics])
 
-            df_sentence = pd.concat([df_climate,df_skeptics,df_news])
+            df_sentence = pd.concat([df_climate,df_skeptics,df_general])
             df_sentence = df_sentence[df_sentence['article'] != None]
             df_sentence['sentence'] = df_sentence['article'].apply(lambda x: sent_token(x))
             df_sentence['new_ind'] = df_sentence['sentence'].apply(lambda x: [i for i in range(len(x))])
@@ -145,12 +153,6 @@ class Dataset():
             self.__dict__.update(tmp_dic)
 
     
-    def climate_words(self):
-        return pd.concat([self.df_climate['article'],self.df_skeptics['article'],  self.df_seed['Paragraph_Text']])
-
-    def news_words(self):
-        return self.df_news['article']
-
 
     def apply_labels(self, df):
         if os.path.exists('labels.csv'):
@@ -183,7 +185,7 @@ class Dataset():
             self.df_labels.to_csv('labels.csv')
 
     def domains(self, df):
-        domains = df.merge(pd.concat([self.df_news, self.df_climate, self.df_skeptics]), right_index = True, left_on = 'parent', how = 'left')['media_url']
+        domains = df.merge(pd.concat([self.df_general, self.df_climate, self.df_skeptics]), right_index = True, left_on = 'parent', how = 'left')['media_url']
         domains.loc[~domains.isna()] = domains.loc[~domains.isna()].apply(lambda x: urlparse(x).netloc)
         return(domains)
         

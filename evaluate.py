@@ -56,6 +56,8 @@ unlabled_frac = [np.e**(-x) for x in range(0,9)]
 labeled_frac = [np.e**(-x - 0.2) for x in range(0,9)] ## Need to leave some testing data
 
 df_eval = pd.DataFrame(columns=['min_count','model_size','alpha','threshold','embedding_parms','author_info','predictive_model_parms','unlabled','labeled', 'filter_evaluation', 'model_evaluation'])
+
+
 labeled_data, unlabled_data = [x for _, x in data.groupby(data['class']==-1)]
 model_size_parms.sort(reverse=True)
 
@@ -76,20 +78,15 @@ Is it worthwhile to gather more data:
  - If inconclusive -> is there a tradeoff between the best filter and the best model
 
 """
-def eval_fracs(var):
-    l_frac = var[0]
-    u_frac = var[1]
-
-    labeled_train, m_test = train_test_split(labeled_data, train_size=l_frac, random_state = 1)
+for u_frac in unlabled_frac:
     unlabeled_train = unlabled_data.sample(frac = u_frac, random_state=1)
-    train = pd.concat([labeled_train,unlabeled_train])
 
     # Create all of the filters
     for min_count in min_count_parms:
         for alpha in alpha_parms:
             ## Due to how the filter is built, it can be trained once and altered each time for treashold and model_size
             f = Filter({'min_count':min_count,'alpha':alpha})
-            f.train(train[train['weak_climate']]['sentence'],train[~train['weak_climate']]['sentence'])
+            f.train(unlabeled_train[unlabeled_train['weak_climate']]['sentence'],unlabeled_train[~unlabeled_train['weak_climate']]['sentence'])
             for model_size in model_size_parms:
                 f.model_size = model_size
                 f.model = f.model.iloc[0:model_size]
@@ -103,43 +100,29 @@ def eval_fracs(var):
     ## Best flter is also small
     f = df_eval.loc[df_eval['filter_evaluation'][df_eval['model_size'] <= 500].apply(lambda x: x['macro avg']['f1-score']).sort_values(ascending = False).index[0]]
     f['filter'] = Filter({'min_count':f['min_count'],'alpha':f['alpha'],'model_size':f['model_size'],'threshold':f['threshold']})
-    f['filter'].train(train[train['weak_climate']]['sentence'],train[~train['weak_climate']]['sentence'])
+    f['filter'].train(unlabeled_train[unlabeled_train['weak_climate']]['sentence'],unlabeled_train[~unlabeled_train['weak_climate']]['sentence'])
 
-    
     # Given the Best Filter, What is the best model?
-    probs = f['filter'].predict(train,return_prob=True)
+    probs = f['filter'].predict(unlabeled_train,return_prob=True)
     for threshold in [0,f['threshold']]:
-        filtered_train = train[probs > threshold]
-        print(filtered_train)
+        filtered_unlabeled_train = unlabeled_train[probs > threshold]
         for embedding in embedding_parms:
-            train = train.drop(['vector'], axis=1, errors='ignore')
-            print(embedding)
-            author_info = True
-            e = Embedding(model_type=embedding, author_info=author_info)
-            e.train(filtered_train)
-            train.loc[train['class'] != -1,'vector'] = e.predict(train[train['class'] != -1])
-            m_test['vector'] = e.predict(m_test)
-            for predictive_model in predictive_model_parms:
-                m = Predictive_model(model=predictive_model)
-                m.train(train)
-                print(m_test.groupby(m_test.vector.apply(lambda x: x.shape)).count())
-                predicted = m.predict(m_test)
-                report = classification_report(m_test['class'], predicted, output_dict = True)
-                df_eval.loc[len(df_eval)] = [f['min_count'],f['model_size'],f['alpha'],f['threshold'],embedding,author_info,predictive_model,len(unlabeled_train),len(labeled_train), f['filter_evaluation'], report]
-            #Simply togle the embedding scheme author_info rather than 
-            train = train.drop(['vector'], axis=1, errors='ignore')
-            author_info = False
-            e.author_info = author_info
-            train.loc[train['class'] != -1,'vector'] = e.predict(train[train['class'] != -1])
-            m_test['vector'] = e.predict(m_test)
-            for predictive_model in predictive_model_parms:
-                m = Predictive_model(model=predictive_model)
-                m.train(train)
-                predicted = m.predict(m_test)
-                report = classification_report(m_test['class'], predicted, output_dict = True)
-                df_eval.loc[len(df_eval)] = [f['min_count'],f['model_size'],f['alpha'],threshold,embedding,author_info,predictive_model,len(unlabeled_train),len(labeled_train), f['filter_evaluation'], report]
-    df_eval.to_pickle(f'./picklejar/eval{str(l_frac)}{str(u_frac)}')
-    return df_eval
+            for author_info in [True,False]:
+                if author_info == True:
+                    e = Embedding(model_type=embedding, author_info=author_info)
+                    e.train(filtered_unlabeled_train)
+                else:
+                    e.author_info = False
+                for l_frac in labeled_frac:
+                    labeled_train, m_test = train_test_split(labeled_data, train_size=l_frac, random_state = 1)
+                    filtered_labeled_train = labeled_train[f['filter'].predict(labeled_train,return_prob=True)  > threshold]
+                    m_test['vector'] = e.predict(m_test)
+                    for predictive_model in predictive_model_parms:
+                        m = Predictive_model(model=predictive_model)
+                        m.train(filtered_labeled_train)
+                        predicted = m.predict(m_test)
+                        report = classification_report(m_test['class'], predicted, output_dict = True)
+                        df_eval.loc[len(df_eval)] = [f['min_count'],f['model_size'],f['alpha'],f['threshold'],embedding,author_info,predictive_model,len(unlabeled_train),len(labeled_train), f['filter_evaluation'], report]
             
 
 evals = list(product(labeled_frac,unlabled_frac))
