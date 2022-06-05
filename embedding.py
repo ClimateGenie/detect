@@ -29,7 +29,7 @@ class Embedding():
     
 
     def train(self, training_data):
-        print('Training Embedding Scheme')
+        print(f'Training {self.model_type} Scheme on {len(training_data)} examples')
         self.training_data = training_data
 
         if self.model_type == 'doc2vecdm':

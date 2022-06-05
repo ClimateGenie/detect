@@ -74,7 +74,7 @@ class Model():
 
 
     def predict(self,df):
-        df['climate'] = self.filter.predict(df)
+        df['climate'] = self.filter.predict(df,quiet = True)
         df.loc[df['climate'] == True,'vector'] = self.embedding_scheme.predict(df[df['climate'] == True])
         df.loc[df['climate'] == True,'class'] = self.predictive_model.predict(df[df['climate'] == True])
         df.loc[df['class'].isna(),'class'] = 0

@@ -87,7 +87,7 @@ class Dataset():
 
 
             df_climate['article'] = simple_map(self.get_articles, df_climate['media_url'], 'Fetching Climate Articles')
-            df_general['article'] = simple_map(self.get_articles, df_general['media_url'], 'Fetching News Articles')
+            df_general['article'] = simple_map(self.get_articles, df_general['media_url'], 'Fetching General Articles')
             df_skeptics['article'] = simple_map(self.get_articles, df_skeptics['media_url'], 'Fetching Skeptics Articles')
 
 

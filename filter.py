@@ -60,7 +60,7 @@ class Filter():
             self.model = self.norm
 
 
-    def predict(self, df, return_prob = False):
+    def predict(self, df, return_prob = False, quiet= False):
         df_store = df.copy()
         if len(self.model) >0:
             df['word'] = df['sentence'].apply(lambda x: word_token(x))
@@ -70,9 +70,14 @@ class Filter():
 
 
             df[['p', '!p']] = None,None
-            for word in tqdm(words, total=len(words)):
-                df.loc[df['word'] == word,'p'] = self.model[word]
-                df.loc[df['word'] == word,'!p'] = 1-self.model[word]
+            if quiet:
+                for word in words:
+                    df.loc[df['word'] == word,'p'] = self.model[word]
+                    df.loc[df['word'] == word,'!p'] = 1-self.model[word]
+            else:
+                for word in tqdm(words, total=len(words)):
+                    df.loc[df['word'] == word,'p'] = self.model[word]
+                    df.loc[df['word'] == word,'!p'] = 1-self.model[word]
             
             
             df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
