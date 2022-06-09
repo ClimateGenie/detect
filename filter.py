@@ -9,8 +9,7 @@ import pandas as pd
 class Filter():
     def __init__(self,kwargs = {}):
 
-        self.alpha = kwargs.get('alpha',1)
-        self.min_count = kwargs.get('min_count', 10)
+        self.min_count = kwargs.get('min_count', 1000)
         self.threshold = kwargs.get('threshold', 0.9)
         self.model_size = int(kwargs.get('model_size', 500))
 
@@ -24,16 +23,15 @@ class Filter():
         target_count = dict(Counter(self.target_words))
         general_count = dict(Counter(self.general_words))
 
-        total_count = {k: general_count.get(k, 0) + target_count.get(k, 0) for k in set(general_count)}
+        self.total_count = {k: general_count.get(k, 0) + target_count.get(k, 0) for k in set(general_count)}
 
         # Can only concider words that are in the general list to avoid division by zero errors 
-        word_dict = set([k for k,v in total_count.items() if v > self.min_count])
-        self.normed_target = {k: target_count[k] if k in target_count.keys() else 0 for k in word_dict}
-        self.normed_general = {k: general_count[k] if k in general_count.keys() else 0 for k in word_dict}
+        self.normed_target = {k: target_count[k] if k in target_count.keys() else 0 for k in self.total_count.keys()}
+        self.normed_general = {k: general_count[k] if k in general_count.keys() else 0 for k in self.total_count.keys()}
 
-        self.ratio = {k: (self.normed_target[k] +self.alpha)*sum(self.normed_general.values())/(self.normed_general[k] + 2*self.alpha)/sum(self.normed_target.values())  for k in word_dict}
+        words = set([k for k,v in self.total_count.items() if v >= self.min_count])
+        self.ratio = {k: (self.normed_target[k])*sum(self.normed_general.values())/(self.normed_general[k])/sum(self.normed_target.values())  for k in words}
         self.norm = pd.Series({k: v/(v+1)  for k,v in self.ratio.items()})
-
 
 
         """
@@ -48,13 +46,9 @@ class Filter():
             if a word is removed from the model, it maps to a probabilty of 0.5, which correspond to a information loss of abs(pr-0.5)
             for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
         """
-        if len(self.norm) > 0:
-            self.stat = pd.merge(self.norm.rename('pr'), pd.Series(total_count).rename('count'), right_index=True, left_index=True)
-            self.stat['pr'] = abs(self.stat['pr']-0.5)
-            self.stat['count'] = self.stat['count']/self.n_sentence
-            self.stat['score'] = self.stat.apply(lambda x: x['pr']*x['count'], axis = 1)
-            indecies = self.stat.sort_values('score',ascending = False).iloc[0:self.model_size,].index
 
+        indecies = self.norm[self.norm.apply(lambda x: abs(x - 0.5)).sort_values(ascending = False).index].iloc[0:self.model_size,].index
+        if len(indecies) > 0:
             self.model = self.norm.loc[indecies]
         else:
             self.model = self.norm
@@ -81,7 +75,6 @@ class Filter():
             
             
             df_pr = df.groupby(by=lambda x: x)[['p','!p']].prod()
-
 
 
             df_pr['prob'] = df_pr['p']/ (df_pr['p'] + df_pr['!p'])

@@ -73,11 +73,7 @@ class Dataset():
                                         [self.get_links(date,'environment') for date in tqdm(new_timestamps,total=len(new_timestamps))]
                                         ])
             general_urls = flatten([    [self.get_links(date,'news') for date in tqdm(new_timestamps,total=len(new_timestamps))],
-                                        [self.get_links(date,'worldnews') for date in tqdm(new_timestamps,total=len(new_timestamps))],
-                                        [self.get_links(date,'TIL') for date in tqdm(new_timestamps,total=len(new_timestamps))],
-                                        [self.get_links(date,'AutoNewspaper') for date in tqdm(new_timestamps,total=len(new_timestamps))],
-                                        [self.get_links(date,'NewsOfTheStupid') for date in tqdm(new_timestamps,total=len(new_timestamps))],
-                                        [self.get_links(date,'NewsOfTheWeird') for date in tqdm(new_timestamps,total=len(new_timestamps))]
+                                        [self.get_links(date,'worldnews') for date in tqdm(new_timestamps,total=len(new_timestamps))]
                                         ])
             climateskeptics_urls =  [self.get_links(date,'climateskeptics') for date in tqdm(new_timestamps,total=len(new_timestamps))]
 
@@ -164,8 +160,9 @@ class Dataset():
         df['sub_sub_claim'] = None
         
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].join(self.df_labels, how = 'left', rsuffix = '_y')['sub_sub_claim_y']
-
+        
         df.loc[df['sub_sub_claim'].isna(),'sub_sub_claim'] = df[df['sub_sub_claim'].isna()].merge(self.df_seed,left_on = 'parent', right_index = True, how = 'left')['sub_sub_claim_y']
+
 
         return df
 

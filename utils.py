@@ -30,6 +30,7 @@ def simple_starmap(func, ls):
     pool.join()
     return out
 
+
 def simple_map(func, ls, desc = None):
     pool = Pool()
     if desc:
