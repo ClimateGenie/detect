@@ -1,6 +1,4 @@
-import time
 import hashlib
-import collections
 import nltk
 import gensim
 from multiprocessing import Pool
@@ -17,14 +15,34 @@ def sent_token(doc):
 def word_token(sentence):
     if not isinstance(sentence,str):
         sentence = ""
-    return gensim.utils.simple_preprocess(sentence)
+    words =  gensim.utils.simple_preprocess(sentence)
+    return words
 
+def clean_words(words):
+    stop_words = set(nltk.corpus.stopwords.words('english'))
+    eng_words = set(nltk.corpus.words.words())
+    words =  [w for w in words if w in eng_words]
+    words =  [w for w in words if not w in stop_words]
+    return words
+
+def mult_word_token(ls_sentence):
+    stop_words = set(nltk.corpus.stopwords.words('english'))
+    eng_words = set(nltk.corpus.words.words())
+    out = []
+    for sentence in ls_sentence:
+        if not isinstance(sentence,str):
+            sentence = ""
+        words =  gensim.utils.simple_preprocess(sentence)
+        words =  [w for w in words if w in eng_words]
+        words =  [w for w in words if not w in stop_words]
+        out.append(words)
+    return(out)
 
 def flatten(ls):
     return [item for sublist in ls for item in sublist]
 
-def simple_starmap(func, ls):
-    pool = Pool()
+def simple_starmap(func, ls, size = 8):
+    pool = Pool(size)
     out = pool.starmap(func,ls)
     pool.close()
     pool.join()

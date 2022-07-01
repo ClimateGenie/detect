@@ -1,9 +1,6 @@
 from numpy import product
-import os
-from dataset import Dataset
 from utils import *
 from collections import Counter
-import dill
 import pandas as pd
 
 class Filter():
@@ -15,22 +12,25 @@ class Filter():
 
 
     def train(self, target_words,general_words):
-        self.target_words =flatten(map(word_token,target_words))
-        self.general_words =flatten(map(word_token, general_words))
+        self.target_words = word_token(' '.join(target_words))
+        self.general_words = word_token(' '.join(general_words))
         self.n_sentence = len(target_words)+len(general_words)
 
 
         target_count = dict(Counter(self.target_words))
         general_count = dict(Counter(self.general_words))
 
-        self.total_count = {k: general_count.get(k, 0) + target_count.get(k, 0) for k in set(general_count)}
+        self.total_count = {k: general_count.get(k, 0) + target_count.get(k, 0) for k in set(general_count).union(set(target_count))}
 
-        # Can only concider words that are in the general list to avoid division by zero errors 
+        # If words only show up in target count, given ratio based on min count -> grateer min count gives more confidence
         self.normed_target = {k: target_count[k] if k in target_count.keys() else 0 for k in self.total_count.keys()}
         self.normed_general = {k: general_count[k] if k in general_count.keys() else 0 for k in self.total_count.keys()}
 
-        words = set([k for k,v in self.total_count.items() if v >= self.min_count])
-        self.ratio = {k: (self.normed_target[k])*sum(self.normed_general.values())/(self.normed_general[k])/sum(self.normed_target.values())  for k in words}
+        words = set(clean_words([k for k,v in self.total_count.items() if v >= self.min_count]))
+        self.ratio = {k: (self.normed_target[k])*sum(self.normed_general.values())/(self.normed_general[k])/sum(self.normed_target.values())  for k in words.intersection(set(general_count))}
+        # The assume the next sample for words not in general corpus is in the general cormus 
+        for word in words - (set(general_count)):
+            self.ratio[word] = target_count[word]
         self.norm = pd.Series({k: v/(v+1)  for k,v in self.ratio.items()})
 
 
@@ -47,17 +47,15 @@ class Filter():
             for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
         """
 
-        indecies = self.norm[self.norm.apply(lambda x: abs(x - 0.5)).sort_values(ascending = False).index].iloc[0:self.model_size,].index
-        if len(indecies) > 0:
-            self.model = self.norm.loc[indecies]
-        else:
-            self.model = self.norm
+        score = pd.Series([abs(0.5-x) * general_count.get(i,0) for i,x in self.norm.iteritems()], index=self.norm.index)
+        self.norm =  self.norm.loc[score.index]
+        self.model = self.norm.iloc[0:self.model_size]
 
 
     def predict(self, df, return_prob = False, quiet= False):
         df_store = df.copy()
         if len(self.model) >0:
-            df['word'] = df['sentence'].apply(lambda x: word_token(x))
+            df['word'] = mult_word_token(df['sentence'].values)
             df = df.explode('word')
 
             words = set(self.model.index).intersection(set(df['word']))
@@ -98,5 +96,7 @@ class Filter():
             pr =  0.5
         threshold_bool = pr > self.threshold
         return threshold_bool
+    
+    
 
 

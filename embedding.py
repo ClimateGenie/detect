@@ -1,18 +1,9 @@
-from gensim import models
 import pandas as pd
-from numpy import mod, negative
-from dataset import Dataset
-import dill
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from utils import *
-from random import choice, random
 import gensim
 from sklearn.preprocessing import LabelEncoder
-import os
 import numpy as np
-import logging
-import collections
-import pickle
 from scipy.sparse import csr_matrix, hstack
 
 

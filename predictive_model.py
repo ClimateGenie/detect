@@ -59,7 +59,7 @@ class Predictive_model():
     
     def train(self, training_data):
         self.X_train = training_data['vector'].apply(lambda x: np.array(x))
-        self.Y_train = training_data['class'].apply(lambda x: int(x))
+        self.Y_train = training_data['class'].apply(lambda x: str(x))
         self.model = self.model_class(**self.kwargs)
         self.model.fit(vstack(self.X_train), self.Y_train)
 

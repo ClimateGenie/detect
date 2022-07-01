@@ -1,24 +1,17 @@
 from time import sleep
 from urllib.parse import urlparse
-from pandas.core.indexes.api import default_index
 from sklearn.preprocessing import LabelEncoder
 from io import BytesIO
-from zipfile import ZipFile
 from urllib.request import urlopen
-from scipy.stats.distributions import entropy
 import dill
-from pandas.core.algorithms import isin
 from utils import *
-import numpy as np
 import pandas as pd
 import newspaper
 from tqdm import tqdm 
-from multiprocessing import Pool
-from itertools import starmap
 import os
 import requests
 import pandas as pd
-from datetime import datetime, time, timedelta, date
+from datetime import datetime,  timedelta
 import pytz
 import warnings
 import uuid as uuid_mod
@@ -166,12 +159,6 @@ class Dataset():
 
         return df
 
-
-    def encode_labels(self, df):
-        self.encoder = LabelEncoder()
-        df.loc[~df['sub_sub_claim'].isna(), 'class'] = self.encoder.fit_transform(df.loc[~df['sub_sub_claim'].isna(), 'sub_sub_claim'])        
-        df.loc[df['class'].isna(), 'class']  = -1        
-        return df
 
     def get_labels(self, df, n=10):
         df = df.sort_values(['entropy'], ascending = False).iloc[:n]
