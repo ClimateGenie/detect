@@ -1,6 +1,7 @@
 *.swp
 .python-version
 wandb
+artifacts
 wandb-debug.log
 __pycache__
 .ipynb_checkpoints

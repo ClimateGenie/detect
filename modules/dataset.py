@@ -4,7 +4,7 @@ from sklearn.preprocessing import LabelEncoder
 from io import BytesIO
 from urllib.request import urlopen
 import dill
-from utils import *
+from modules.utils import *
 import pandas as pd
 import newspaper
 from tqdm import tqdm 
