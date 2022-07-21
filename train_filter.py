@@ -5,20 +5,21 @@ from modules.filter import Filter, dataset_to_xy
 from modules.dataset import Dataset
 from sklearn.metrics import classification_report
 import os
-import yaml
 
 
-def main()
+
+
+def main():
     sweep_configuration = {
-	"name": "filter_grid_sweep",
+	"name": "filter_grid_sweep_baseline",
 	"metric": {"name": "f1-score", "goal": "maximize"},
 	"method": "grid",
 	"parameters": {
 	    "min_count": {
-		"values": [1,10,100,1000,10000]
+		"values": [10,100,1000,10000]
 	    },
 	    "threshold": {
-		"values": [0.7,0.8,0.9,0.95,0.97,0.99]
+		"values": [0.7,0.8,0.9,0.95]
 	    },
 	    "model_size": {
 		"values": [100,300,1000,3000,10000]
@@ -30,15 +31,13 @@ def main()
     }
 
     sweep_id = wandb.sweep(sweep_configuration)
-
-    # run the sweep
-    wandb.agent(sweep_id, function=train_filter)
+    wandb.agent(sweep_id,function=train_filter)
 
 
 
 
 
-def construct_validation_data():
+def construct_artifacts():
 
     run = wandb.init(project='genie')
     f_val_AL10K = pd.read_csv('https://www.sustainablefinance.uzh.ch/dam/jcr:43546a2f-82d6-49a3-af54-69b02cff54a9/AL-10Ks.tsv%20:%203000%20(58%20positives,%202942%20negatives)%20(TSV,%20127138%20KB).tsv' , sep = '\t')
@@ -59,34 +58,49 @@ def construct_validation_data():
     with artifact.new_file('y_val.npy', 'wb') as f:
         np.save(f,y_val)
     run.log_artifact(artifact)
+    
+    d = Dataset(run)
+    d.load('genie/defaults:latest')
+    X,y = dataset_to_xy(d) 
+
+    artifact = wandb.Artifact('Filter-Train', type = 'FilterData')
+    with artifact.new_file('X.npy', 'wb') as f:
+        np.save(f,X)
+    with artifact.new_file('y.npy', 'wb') as f:
+        np.save(f,y)
+    run.log_artifact(artifact)
 
     run.finish()
 
 def train_filter():
     with wandb.init() as run:
-
-        d = Dataset(run)
-        d.load('genie/defaults:latest')
-        X,y = dataset_to_xy(d) 
         
         artifact = run.use_artifact('genie/Filter-Validation:latest')
         path = artifact.download()
         X_val = np.load(os.path.join(path,'X_val.npy'),allow_pickle=True)
         y_val = np.load(os.path.join(path,'y_val.npy'))
         
+        artifact = run.use_artifact('genie/Filter-Train:latest')
+        path = artifact.download()
+        X = np.load(os.path.join(path,'X.npy'),allow_pickle=True)
+        y = np.load(os.path.join(path,'y.npy'))
 
         filter = Filter(run)
         filter.set_params(**run.config)
+
         filter.fit(X,y)
+
         
         pred_val = filter.predict(X_val)
-        report = classification_report(y_val, pred_val,output_dict=True)
 
-        run.config.update(filter.get_params())
+        report = classification_report(y_val, pred_val,output_dict=True,zero_division=0)
+        print('report')
+
         run.log(report["True"])
         run.log({'accuracy':report["accuracy"]})
+        print('logged')
     
 
 if __name__ == '__main__':
-    construct_validation_data()
-     main()
+    #construct_artifacts()
+    main()

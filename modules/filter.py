@@ -74,14 +74,23 @@ class Filter():
             if a word is removed from the model, it maps to a probabilty of 0.5, which correspond to a information loss of abs(pr-0.5)
             for a word with x probabilty of being in a sentence, expected loss = abs(pr-0.5)*x
         """
+        pr = np.array([ abs(0.5-x) for i,x in self.norm.iteritems()])
+        occ = np.array([general_count.get(i,1) for i,x in self.norm.iteritems()])
+       
+        pr = pr/max(pr)
+        occ = occ/max(occ)
+
+
         if self.rank_score != 1:
             alpha = 1/(3*(self.rank_score-1)**2) - (1/3)
-            score = pd.Series([ (1+alpha**2)*abs(0.5-x) * general_count.get(i,0)/((alpha**2)*abs(0.5-x) + general_count.get(i,0)) for i,x in self.norm.iteritems()], index=self.norm.index)
+            score = pd.Series( (1+alpha**2)*pr*occ/(((alpha**2)*pr) + occ) , index=self.norm.index).sort_values(ascending=False)
         else:
-            score = pd.Series([ abs(0.5-x) for i,x in self.norm.iteritems()], index=self.norm.index).sort_values(ascending=False)
+            score = pd.Series(pr, index=self.norm.index).sort_values(ascending=False)
+
     
         self.norm =  self.norm.loc[score.index]
         self.model = self.norm.iloc[0:self.model_size]
+        self.model
 
         return self
 
