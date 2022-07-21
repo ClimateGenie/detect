@@ -5,6 +5,7 @@ from modules.utils import *
 from collections import Counter
 import pandas as pd
 import wandb
+import dill
 
 class Filter():
     def __init__(self,wandb_run,min_count = 1000, threshold = 0.9, model_size = 500, rank_score = 0.5):
@@ -146,8 +147,6 @@ class Filter():
         return df_store['prob'].values
 
     def save(self, name):
-
-        wandb.config(self.get_params())
         artifact = wandb.Artifact(name, type = 'filter')
         with artifact.new_file('filter.pickle', 'wb') as f:
             dill.dump(self.__dict__,f)
@@ -166,6 +165,7 @@ class Filter():
 
 def dataset_to_xy(dataset):
     X = np.array([dataset.df_sentence.sentence.values]).T
+    X = X.astype('U1024')
     y = dataset.df_sentence.parent.isin(pd.concat([dataset.df_climate,dataset.df_skeptics,dataset.df_seed]).index)
     y = np.where(y == False,-1,y)
     return X, y
