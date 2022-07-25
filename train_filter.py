@@ -11,25 +11,28 @@ import os
 
 def main():
     sweep_configuration = {
-	"name": "filter_grid_sweep_baseline",
+	"name": "filter_grid_sweep_bayes",
 	"metric": {"name": "f1-score", "goal": "maximize"},
-	"method": "grid",
+	"method": "bayes",
 	"parameters": {
 	    "min_count": {
-		"values": [10,100,1000,10000]
+                "min": 0,
+                "max":100000
 	    },
 	    "threshold": {
-		"values": [0.7,0.8,0.9,0.95]
+                "min":0.8,
+                "max":1.0
 	    },
 	    "model_size": {
-		"values": [100,300,1000,3000,10000]
+                "min":1,
+                "max":100000
 	    },
 	    "rank_score": {
-		"values": [0,0.25,0.5,0.75,1]
+                "min":0.0,
+                "max":1.0
 	    }
 	}
     }
-
     sweep_id = wandb.sweep(sweep_configuration)
     wandb.agent(sweep_id,function=train_filter)
 
@@ -94,11 +97,9 @@ def train_filter():
         pred_val = filter.predict(X_val)
 
         report = classification_report(y_val, pred_val,output_dict=True,zero_division=0)
-        print('report')
 
         run.log(report["True"])
         run.log({'accuracy':report["accuracy"]})
-        print('logged')
     
 
 if __name__ == '__main__':
